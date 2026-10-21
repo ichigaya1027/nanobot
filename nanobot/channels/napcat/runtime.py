@@ -11,6 +11,7 @@ import time
 import uuid
 from collections import deque
 from contextlib import nullcontext
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from typing import Annotated, Any, Literal, cast
@@ -95,6 +96,8 @@ class NapcatChannel(BaseChannel):
         self._processed_ids: deque[int] = deque(maxlen=2000)
         self._bot_outbound_ids: deque[int] = deque(maxlen=2000)
         self._background_tasks: set[asyncio.Task[None]] = set()
+        self._group_names: dict[str, str] = {}
+        self._member_names: dict[tuple[str, str], str] = {}
         self.group_observer = GroupObserver(
             self.config.group_agent, self.name, self.bus.publish_inbound, self._prepare_group_message,
         )
@@ -416,6 +419,20 @@ class NapcatChannel(BaseChannel):
     # ------------------------------------------------------------------
 
     async def _on_notice(self, ev: dict[str, Any]) -> None:
+        group_id = str(ev.get("group_id", ""))
+        if (
+            ev.get("notice_type") == "notify" and ev.get("sub_type") == "poke"
+            and self._self_id is not None and str(ev.get("target_id")) == str(self._self_id)
+            and self.group_observer.enabled(group_id)
+        ):
+            if ev.get("user_id") is None or not self.is_allowed(str(ev["user_id"])):
+                return
+            await self._observe_group({
+                **ev, "message_type": "group", "message_id": f"notice:{uuid.uuid4().hex}",
+                "targetable": False,
+                "message": [{"type": "poke", "data": {"qq": str(ev["target_id"])}}],
+            })
+            return
         if ev.get("notice_type") != "group_increase" or not self.config.welcome_new_members:
             return
 
@@ -514,7 +531,11 @@ class NapcatChannel(BaseChannel):
             return
         segments = self._normalize_segments(event.get("message"))
         text, _images, mentioned, reply_id = self._parse_segments(segments)
-        directed = mentioned or (reply_id is not None and reply_id in self._bot_outbound_ids)
+        directed = mentioned or any(
+            segment.get("type") == "poke" and isinstance(segment.get("data"), dict)
+            and str(segment["data"].get("qq")) == str(self._self_id)
+            for segment in segments
+        ) or (reply_id is not None and reply_id in self._bot_outbound_ids)
         if not own and reply_id is not None and not directed:
             try:
                 response = await self._call_action("get_msg", {"message_id": reply_id})
@@ -541,13 +562,114 @@ class NapcatChannel(BaseChannel):
         self.group_observer.observe(message, own=own, directed=directed, received_at=received_at)
 
     async def _prepare_group_message(self, message: GroupMessage) -> GroupMessage:
+        message = await self._enrich_group_message(message)
         _text, images, _mentioned, _reply = self._parse_segments(message.segments)
         media: list[str] = []
+        paths: dict[str, str] = {}
         for image in images:
             path = await self._download_image(image)
             if path:
                 media.append(path)
-        return replace(message, media=tuple(media))
+                paths[str(image.get("url", ""))] = path
+        segments = deepcopy(message.segments)
+        for segment in segments:
+            data = segment.get("data")
+            if segment.get("type") == "image" and isinstance(data, dict):
+                data = cast(dict[str, Any], data)
+                path = paths.get(str(data.get("url", "")))
+                if path:
+                    data["local_path"] = path
+        return replace(message, segments=segments, media=tuple(media))
+
+    async def _enrich_group_message(self, message: GroupMessage) -> GroupMessage:
+        group = message.group_id
+        if message.name:
+            self._member_names[(group, message.sender_id)] = message.name
+        if message.group_name:
+            self._group_names[group] = message.group_name
+        if group not in self._group_names:
+            try:
+                response = await self._call_action("get_group_info", {"group_id": group})
+                data = response.get("data")
+                if isinstance(data, dict):
+                    group_data = cast(dict[str, Any], data)
+                    if group_data.get("group_name"):
+                        self._group_names[group] = str(group_data["group_name"])
+            except (RuntimeError, TimeoutError, OSError) as error:
+                logger.debug("Could not retrieve group name: {}", error)
+        segments = deepcopy(message.segments)
+        for segment in segments:
+            data = segment.get("data")
+            if not isinstance(data, dict):
+                continue
+            data = cast(dict[str, Any], data)
+            if segment.get("type") == "at" and str(data.get("qq", "")).isdecimal():
+                user = str(data["qq"])
+                if data.get("name"):
+                    self._member_names[(group, user)] = str(data["name"])
+                else:
+                    data["name"] = await self._member_name(group, user)
+            elif segment.get("type") == "reply" and data.get("id") is not None:
+                try:
+                    response = await self._call_action("get_msg", {"message_id": data["id"]})
+                    raw = response.get("data")
+                    if isinstance(raw, dict) and str(cast(dict[str, Any], raw).get("group_id")) == group:
+                        target = GroupMessage.parse(cast(dict[str, Any], raw))
+                        data.update({
+                            "sender_id": target.sender_id, "sender_name": target.name,
+                            "time": target.timestamp,
+                            "text": self._parse_segments(target.segments)[0],
+                        })
+                except (ValueError, RuntimeError, TimeoutError, OSError) as error:
+                    logger.debug("Could not enrich reply context: {}", error)
+        name = message.name or await self._member_name(group, message.sender_id)
+        return replace(message, name=name, group_name=self._group_names.get(group, ""), segments=segments)
+
+    async def _member_name(self, group: str, user: str) -> str:
+        key = (group, user)
+        if key not in self._member_names:
+            self._member_names[key] = await self._lookup_member_name(int(group), int(user))
+        return self._member_names[key]
+
+    async def _transcribe_group_voice(self, message: GroupMessage) -> str:
+        from nanobot.audio.transcription import resolve_transcription_config, transcribe_audio_file
+        from nanobot.config.loader import load_config
+
+        voices = [
+            segment["data"] for segment in message.segments
+            if segment.get("type") == "record" and isinstance(segment.get("data"), dict)
+        ]
+        if not voices:
+            raise ValueError("This message contains no voice attachments")
+        config = resolve_transcription_config(load_config())
+        if not config.enabled or not config.configured:
+            raise ValueError("Configure nanobot transcription before requesting a voice transcript")
+        transcripts: list[str] = []
+        for voice in voices:
+            response = await self._call_action("get_record", {
+                "file": voice.get("file") or voice.get("url"), "out_format": "mp3",
+            })
+            data = response.get("data")
+            encoded = cast(dict[str, Any], data).get("base64") if isinstance(data, dict) else None
+            if not isinstance(encoded, str) or not encoded:
+                raise ValueError("NapCat returned no converted audio data")
+            maximum = config.max_upload_mb * 1024 * 1024
+            if len(encoded) > ((maximum + 2) // 3) * 4:
+                raise ValueError("Converted voice exceeds the configured transcription upload limit")
+            raw = base64.b64decode(encoded, validate=True)
+            if len(raw) > maximum:
+                raise ValueError("Converted voice exceeds the configured transcription upload limit")
+            path = self._media_root / f"voice-{uuid.uuid4().hex}.mp3"
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                await asyncio.to_thread(path.write_bytes, raw)
+                text = (await transcribe_audio_file(path, config)).strip()
+                if not text:
+                    raise RuntimeError("Transcription returned no text")
+                transcripts.append(text)
+            finally:
+                path.unlink(missing_ok=True)
+        return "\n".join(transcripts)
 
     async def _group_action(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
         try:
@@ -572,6 +694,7 @@ class NapcatChannel(BaseChannel):
         return group_turn_policy(
             message, group_id, self.name, tools, self._group_action,
             self._build_image_segment, self.group_observer,
+            enrich=self._enrich_group_message, transcribe=self._transcribe_group_voice,
         )
 
     async def _build_image_segment(self, ref: str) -> dict[str, Any] | None:

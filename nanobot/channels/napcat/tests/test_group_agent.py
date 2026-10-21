@@ -33,7 +33,7 @@ from nanobot.security.workspace_access import (
 def message(mid=1, user=7, text="hello", **extra):
     return {
         "post_type": "message", "message_type": "group", "group_id": 100, "message_id": mid,
-        "user_id": user, "time": 1700000000 + mid, "sender": {"nickname": str(user)},
+        "user_id": user, "time": 1700000000 + mid, "sender": {"nickname": str(user)}, "group_name": "Test group",
         "message": [{"type": "text", "data": {"text": text}}], **extra,
     }
 
@@ -133,6 +133,7 @@ async def test_history_reports_actual_scan_and_rejects_other_groups(tmp_path):
     page = [message(3, text="find this"), message(2, text="other")]
     ch._call_action = AsyncMock(side_effect=[
         {"data": {"messages": page}}, {"data": {"messages": page}},
+        {"data": {"message_id": 88}},
         {"data": message(9, group_id=200)},
     ])
     policy = ch.turn_policy(InboundMessage("napcat", "7", "group:100", ""), "napcat:group:100", ToolRegistry())
@@ -140,13 +141,38 @@ async def test_history_reports_actual_scan_and_rejects_other_groups(tmp_path):
     with request_context(RequestContext("napcat", "group:100", workspace=tmp_path)):
         result = await policy.tools.execute("search_chat_history", {"keyword": "find", "count": 2})
         parsed = json.loads(result)
-        assert [m["message_id"] for m in parsed["messages"]] == ["3"]
+        assert parsed["messages"] == "QQ group 100 Test group\n[2023-11-14T22:13Z] (7)7 #3: find this"
         assert parsed["scanned_count"] == 2
         assert parsed["complete"] is False
         assert parsed["stop_reason"] == "no_progress"
+        reply = await policy.tools.execute("reply_message", {
+            "message_id": "3", "content": "found", "end_response": True,
+        })
+        assert not reply.is_error
         rejected = await policy.tools.execute("get_message", {"message_id": "9"})
         assert rejected.is_error
     assert ch._call_action.call_args_list[0].args[0] == "get_group_msg_history"
+    await ch.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool", ["get_message", "get_chat_history"])
+async def test_queries_render_lines_and_keep_targets_available_for_reply(tmp_path, tool):
+    ch = channel()
+    record = message(9, text="earlier question")
+    ch._call_action = AsyncMock(side_effect=[
+        {"data": record if tool == "get_message" else {"messages": [record]}},
+        {"data": {"message_id": 88}},
+    ])
+    policy = ch.turn_policy(InboundMessage("napcat", "7", "group:100", ""), "napcat:group:100", ToolRegistry())
+    assert policy is not None
+    with request_context(RequestContext("napcat", "group:100", workspace=tmp_path)):
+        result = await policy.tools.execute(tool, {"message_id": "9"} if tool == "get_message" else {})
+        field = "message" if tool == "get_message" else "messages"
+        assert json.loads(result)[field] == "QQ group 100 Test group\n[2023-11-14T22:13Z] (7)7 #9: earlier question"
+        reply = await policy.tools.execute("reply_message", {"message_id": "9", "content": "answer"})
+        assert not reply.is_error
+    assert ch._call_action.call_args.args[1]["message"][0] == {"type": "reply", "data": {"id": "9"}}
     await ch.stop()
 
 
@@ -168,10 +194,9 @@ async def test_runtime_steer_updates_reply_targets_and_avoids_final_roundtrip(tm
     async def model(**kwargs):
         calls.append(kwargs["messages"])
         if len(calls) == 1:
-            await pending.put(InboundMessage(
-                "napcat", "7", "group:100", "new question", session_key_override="napcat:group:100",
-                metadata={OBSERVATION_KEY: [message(2)]},
-            ))
+            await ch._on_message(message(2, text="new question"))
+            await ch.group_observer.flush("100")
+            await pending.put(await ch.bus.consume_inbound())
             return LLMResponse(content="internal preamble", tool_calls=[
                 ToolCallRequest(id="a", name="react_message", arguments={"message_id": "1", "emoji_id": "76"}),
             ])
@@ -189,7 +214,7 @@ async def test_runtime_steer_updates_reply_targets_and_avoids_final_roundtrip(tm
         result = await loop._process_message(first, pending_queue=pending)
         assert result is None
         assert len(calls) == 2
-        assert any("new question" in str(row.get("content")) for row in calls[1])
+        assert any("[2023-11-14T22:13Z] (7)7 #2: new question" in str(row.get("content")) for row in calls[1])
         send = ch._call_action.call_args_list[-1]
         assert send.args[0] == "send_msg"
         assert send.args[1]["message"][0] == {"type": "reply", "data": {"id": "2"}}

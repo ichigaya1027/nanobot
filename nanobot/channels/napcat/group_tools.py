@@ -18,12 +18,15 @@ from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.turn_policy import TurnPolicy
 from nanobot.bus.events import InboundMessage
 from nanobot.channels.napcat.group_agent import OBSERVATION_KEY, GroupMessage, GroupObserver
+from nanobot.channels.napcat.group_rendering import render_group_messages
 from nanobot.security.workspace_access import current_tool_workspace
 from nanobot.utils.helpers import strip_think
 from nanobot.utils.prompt_templates import render_template
 
 ActionCaller = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 ImageBuilder = Callable[[str], Awaitable[dict[str, Any] | None]]
+MessageEnricher = Callable[[GroupMessage], Awaitable[GroupMessage]]
+VoiceTranscriber = Callable[[GroupMessage], Awaitable[str]]
 
 
 class ActionRejectedError(RuntimeError):
@@ -41,6 +44,8 @@ class GroupRun:
     call: ActionCaller
     image: ImageBuilder
     observer: GroupObserver
+    enrich: MessageEnricher | None = None
+    transcribe: VoiceTranscriber | None = None
     messages: dict[str, GroupMessage] = field(default_factory=dict)
     users: set[str] = field(default_factory=set)
     outcomes: list[str] = field(default_factory=list)
@@ -81,12 +86,17 @@ class GroupRun:
         logger.info("Group agent: channel={} group={} outcome={}", self.channel, self.group_id, outcome)
 
     async def get_message(self, message_id: str) -> GroupMessage:
+        if message_id in self.messages and not self.messages[message_id].targetable:
+            raise ValueError("This event has no platform message ID")
         response = await self.call("get_msg", {"message_id": message_id})
         data = response.get("data")
         if not isinstance(data, dict):
             raise ValueError("NapCat returned no message")
         message = GroupMessage.parse(cast(dict[str, Any], data))
         self.accept(message)
+        if self.enrich is not None:
+            message = await self.enrich(message)
+            self.accept(message)
         return message
 
     async def history(self, anchor: str, count: int) -> list[GroupMessage]:
@@ -106,6 +116,9 @@ class GroupRun:
                 raise ValueError("NapCat returned an invalid message")
             message = GroupMessage.parse(cast(dict[str, Any], row))
             self.accept(message)
+            if self.enrich is not None:
+                message = await self.enrich(message)
+                self.accept(message)
             messages.append(message)
         return messages
 
@@ -114,6 +127,8 @@ class GroupRun:
         if reply:
             if reply not in self.messages and reply not in self.sent_ids:
                 raise ValueError("Read the target message in this group before replying to it")
+            if reply in self.messages and not self.messages[reply].targetable:
+                raise ValueError("This event cannot be quoted as a message")
             segments.append({"type": "reply", "data": {"id": reply}})
         for user_id in mentions:
             if user_id not in self.users:
@@ -160,6 +175,7 @@ _DESCRIPTIONS = {
     "poke_user": "Poke a user observed in the active QQ group.",
     "stay_silent": "End this response without another visible action. Previously completed actions remain.",
     "get_message": "Retrieve a message from NapCat by ID. The message must belong to this group.",
+    "get_voice_transcript": "Transcribe voice attachments from an observed or retrieved message in this group using the configured transcription provider.",
     "get_chat_history": "Read a page of group history from NapCat. A page is not proof of complete history.",
     "search_chat_history": "Scan bounded pages from NapCat and filter by keyword, sender and time. Inspect the returned scan coverage and continuation anchor before concluding that no matching message exists.",
 }
@@ -178,7 +194,7 @@ class QQGroupTool(Tool):
 
     @property
     def read_only(self) -> bool:
-        return self.name in {"get_message", "get_chat_history", "search_chat_history"}
+        return self.name in {"get_message", "get_voice_transcript", "get_chat_history", "search_chat_history"}
 
     @property
     def description(self) -> str:
@@ -195,7 +211,7 @@ class QQGroupTool(Tool):
                 "mentions": {"type": "array", "items": {"type": "string"}},
             })
             required.append("content")
-        if self.name in {"reply_message", "react_message", "get_message"}:
+        if self.name in {"reply_message", "react_message", "get_message", "get_voice_transcript"}:
             fields["message_id"] = {"type": "string"}
             required.append("message_id")
         if self.name == "react_message":
@@ -247,7 +263,12 @@ class QQGroupTool(Tool):
 
     async def _execute(self, args: dict[str, Any]) -> dict[str, Any]:
         if self.name == "get_message":
-            return {"message": (await self.run.get_message(args["message_id"])).wire()}
+            return {"message": render_group_messages([await self.run.get_message(args["message_id"])])}
+        if self.name == "get_voice_transcript":
+            if self.run.transcribe is None:
+                raise ValueError("Voice transcription is unavailable")
+            message = self.run.messages.get(args["message_id"]) or await self.run.get_message(args["message_id"])
+            return {"message_id": message.message_id, "transcript": await self.run.transcribe(message)}
         if self.name in {"get_chat_history", "search_chat_history"}:
             return await self._query(args)
         if self.name in {"send_message", "reply_message"}:
@@ -259,6 +280,8 @@ class QQGroupTool(Tool):
         elif self.name == "react_message":
             if args["message_id"] not in self.run.messages and args["message_id"] not in self.run.sent_ids:
                 raise ValueError("Read this group's target message before reacting")
+            if args["message_id"] in self.run.messages and not self.run.messages[args["message_id"]].targetable:
+                raise ValueError("This event cannot receive a message reaction")
             await self.run.call("set_msg_emoji_like", {
                 "message_id": args["message_id"], "emoji_id": args["emoji_id"], "set": True,
             })
@@ -279,7 +302,7 @@ class QQGroupTool(Tool):
         count = int(args.get("count", 50))
         pages = int(args.get("max_pages", 5)) if self.name == "search_chat_history" else 1
         scanned: dict[str, GroupMessage] = {}
-        matched: list[dict[str, Any]] = []
+        matched: list[GroupMessage] = []
         reason = "budget_exhausted"
         error: str | None = None
         for _ in range(pages):
@@ -306,7 +329,7 @@ class QQGroupTool(Tool):
                     and (not args.get("since") or message.timestamp >= int(args["since"]))
                     and (not args.get("until") or message.timestamp <= int(args["until"]))
                 ):
-                    matched.append(message.wire())
+                    matched.append(message)
             oldest = min(messages, key=lambda message: (
                 message.timestamp, int(message.real_seq) if message.real_seq.isdecimal() else 0,
             ))
@@ -319,7 +342,7 @@ class QQGroupTool(Tool):
                 break
         times = [message.timestamp for message in scanned.values()]
         return {
-            "messages": matched, "scanned_count": len(scanned), "scanned_from": min(times) if times else None,
+            "messages": render_group_messages(matched), "scanned_count": len(scanned), "scanned_from": min(times) if times else None,
             "scanned_to": max(times) if times else None, "stop_reason": reason,
             "complete": False, "next_anchor": anchor, "source_error": error,
         }
@@ -358,8 +381,9 @@ class GroupMessageAlias(Tool):
 def group_turn_policy(
     message: InboundMessage, group_id: str, channel: str, tools: ToolRegistry,
     call: ActionCaller, image: ImageBuilder, observer: GroupObserver,
+    *, enrich: MessageEnricher | None = None, transcribe: VoiceTranscriber | None = None,
 ) -> TurnPolicy:
-    run = GroupRun(channel, group_id, call, image, observer)
+    run = GroupRun(channel, group_id, call, image, observer, enrich, transcribe)
     run.observe(message)
     registry = ToolRegistry()
     for name in tools.tool_names:

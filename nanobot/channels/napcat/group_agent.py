@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Generator
@@ -15,6 +14,7 @@ from loguru import logger
 from pydantic import Field
 
 from nanobot.bus.events import InboundMessage
+from nanobot.channels.napcat.group_rendering import render_group_messages
 from nanobot.config_base import Base
 
 OBSERVATION_KEY = "_napcat_observation"
@@ -37,6 +37,8 @@ class GroupMessage:
     segments: list[dict[str, Any]]
     media: tuple[str, ...] = ()
     real_seq: str = ""
+    group_name: str = ""
+    targetable: bool = True
 
     @classmethod
     def parse(cls, raw: dict[str, Any], media: tuple[str, ...] = ()) -> GroupMessage:
@@ -55,6 +57,7 @@ class GroupMessage:
             str(raw["message_id"]), str(raw["group_id"]), str(raw["user_id"]),
             int(raw.get("time") or 0), str(sender.get("card") or sender.get("nickname") or ""),
             segments, media, str(raw.get("real_seq") or ""),
+            str(raw.get("group_name") or ""), raw.get("targetable", True) is True,
         )
 
     def wire(self) -> dict[str, Any]:
@@ -62,6 +65,7 @@ class GroupMessage:
             "message_id": self.message_id, "group_id": self.group_id, "user_id": self.sender_id,
             "time": self.timestamp, "sender": {"nickname": self.name}, "message": self.segments,
             "real_seq": self.real_seq,
+            "group_name": self.group_name, "targetable": self.targetable,
         }
 
 
@@ -168,7 +172,7 @@ class GroupObserver:
             await self.publish(InboundMessage(
                 channel=self.channel, sender_id=messages[-1].sender_id, chat_id=f"group:{group_id}",
                 session_key_override=f"{self.channel}:group:{group_id}",
-                content=json.dumps({"group_id": group_id, "messages": records}, ensure_ascii=False),
+                content=render_group_messages(ordered),
                 media=[path for message in ordered for path in message.media],
                 metadata={OBSERVATION_KEY: records, "is_group": True},
             ))
