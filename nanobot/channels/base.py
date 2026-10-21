@@ -278,6 +278,13 @@ class BaseChannel(ABC):
             return True
         return False
 
+    def is_message_allowed(
+        self, sender_id: str, chat_id: str, authorization_id: str | None = None,
+    ) -> bool:
+        """Check access using the channel's message context."""
+        permission_id = authorization_id if authorization_id is not None else sender_id
+        return self.is_allowed(permission_id)
+
     async def _handle_message(
         self,
         sender_id: str,
@@ -291,15 +298,14 @@ class BaseChannel(ABC):
         require_existing_session: bool = False,
         session_generation: str | None = None,
     ) -> None:
-        """Handle a message after checking its authorization subject.
+        """Handle a message after checking channel-specific access.
 
         ``sender_id`` is the identity recorded on the inbound message.  Channels
         where access is scoped to another entity (for example, a group or room)
-        can pass that entity as ``authorization_id`` without changing the
-        sender's identity.  When omitted, authorization remains sender-based.
+        can override ``is_message_allowed`` to use ``chat_id``. Existing
+        ``authorization_id`` callers retain their original subject-based check.
         """
-        permission_id = authorization_id if authorization_id is not None else sender_id
-        if not self.is_allowed(permission_id):
+        if not self.is_message_allowed(sender_id, chat_id, authorization_id):
             if is_dm:
                 try:
                     code = generate_code(self.name, str(sender_id))
