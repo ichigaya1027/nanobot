@@ -1,6 +1,5 @@
 """Context builder for assembling agent prompts."""
 
-import base64
 import mimetypes
 import platform
 from dataclasses import dataclass
@@ -21,7 +20,7 @@ from nanobot.security.workspace_access import WorkspaceScopeResolver
 from nanobot.session.keys import last_channel_from_metadata
 from nanobot.session.manager import Session
 from nanobot.session.summary import SessionSummary
-from nanobot.utils.helpers import detect_image_mime, load_bundled_template
+from nanobot.utils.helpers import build_inline_image_block, detect_image_mime, load_bundled_template
 from nanobot.utils.prompt_templates import render_template
 
 
@@ -340,12 +339,7 @@ class ContextBuilder:
             mime = detect_image_mime(raw) or mimetypes.guess_type(path)[0]
             if not mime or not mime.startswith("image/"):
                 continue
-            b64 = base64.b64encode(raw).decode()
-            image_blocks.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{mime};base64,{b64}"},
-                "_meta": {"path": str(p)},
-            })
+            image_blocks.append(build_inline_image_block(raw, mime, str(p)))
 
         if not image_blocks:
             return text

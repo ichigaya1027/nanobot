@@ -14,9 +14,10 @@ from typing import Any, cast
 from loguru import logger
 from PIL import Image, ImageOps
 
+from nanobot.utils.helpers import SMALL_INLINE_IMAGE_BYTES
+
 # A soft transport target, including base64 expansion, rather than an API size limit.
 INLINE_IMAGE_BYTE_BUDGET = 1_000_000
-_SMALL_IMAGE_BYTES = 64_000
 
 
 @dataclass(frozen=True)
@@ -103,7 +104,7 @@ def _prepare_copies(body: dict[str, Any], total_bytes: int) -> dict[str, Any]:
     copies: list[_ImageCopy] = []
     try:
         for block in blocks:
-            if len(block.url) <= _SMALL_IMAGE_BYTES:
+            if len(block.url) <= SMALL_INLINE_IMAGE_BYTES:
                 continue
             try:
                 raw = base64.b64decode(block.url.split(";base64,", 1)[1], validate=True)

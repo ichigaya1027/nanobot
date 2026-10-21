@@ -611,6 +611,27 @@ def test_save_turn_keeps_image_placeholder_and_runtime_context() -> None:
     ]
 
 
+def test_native_image_ingress_retains_small_preview_and_retires_large_original(tmp_path) -> None:
+    from random import Random
+
+    from PIL import Image
+
+    small = tmp_path / "preview.png"
+    large = tmp_path / "original.png"
+    Image.new("RGB", (16, 16), "white").save(small)
+    Image.frombytes("RGB", (256, 256), Random(0).randbytes(256 * 256 * 3)).save(large)
+    builder = ContextBuilder(tmp_path)
+    current = builder.build_current_message("inspect", media=[str(small), str(large)])
+    images = [part for part in current["content"] if part["type"] == "image_url"]
+    assert len(images) == 2
+    loop = _mk_loop()
+    session = Session(key="test:preview-history")
+    loop._save_turn(session, [current], skip=0)
+    replay = session.get_history()[0]["content"]
+    assert [part["image_url"]["url"] for part in replay if part["type"] == "image_url"] == [images[0]["image_url"]["url"]]
+    assert any(part.get("text") == f"[image: {large}]" for part in replay)
+
+
 def test_save_turn_keeps_image_placeholder_without_meta() -> None:
     loop = _mk_loop()
     session = Session(key="test:image-no-meta")

@@ -342,17 +342,24 @@ def detect_image_mime(data: bytes) -> str | None:
     return None
 
 
+SMALL_INLINE_IMAGE_BYTES = 64_000
+
+
+def build_inline_image_block(raw: bytes, mime: str, path: str) -> dict[str, Any]:
+    """Keep original references and mark small image previews for history replay."""
+    url = f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+    meta: dict[str, Any] = {"path": path}
+    if len(url) <= SMALL_INLINE_IMAGE_BYTES:
+        meta["retain_preview"] = True
+    return {"type": "image_url", "image_url": {"url": url}, "_meta": meta}
+
+
 def build_image_content_blocks(
     raw: bytes, mime: str, path: str, label: str
 ) -> list[dict[str, Any]]:
     """Build native image blocks plus a short text label."""
-    b64 = base64.b64encode(raw).decode()
     return [
-        {
-            "type": "image_url",
-            "image_url": {"url": f"data:{mime};base64,{b64}"},
-            "_meta": {"path": path},
-        },
+        build_inline_image_block(raw, mime, path),
         {"type": "text", "text": label},
     ]
 

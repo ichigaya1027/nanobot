@@ -2471,6 +2471,9 @@ class AgentLoop:
                 image_url.get("url", "")
             ).startswith("data:image/"):
                 internal_meta = cast(dict[str, Any], block_data.get("_meta") or {})
+                if internal_meta.get("retain_preview") is True:
+                    filtered.append(block_data)
+                    continue
                 path = cast(str, internal_meta.get("path", ""))
                 filtered.append(
                     {"type": "text", "text": image_placeholder_text(path)}
