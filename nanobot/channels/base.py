@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -17,6 +18,10 @@ from nanobot.pairing import (
     is_approved,
     record_delivery,
 )
+
+if TYPE_CHECKING:
+    from nanobot.agent.tools.registry import ToolRegistry
+    from nanobot.agent.turn_policy import TurnPolicy
 
 
 class BaseChannel(ABC):
@@ -33,6 +38,7 @@ class BaseChannel(ABC):
     send_tool_hints: bool = True
     show_reasoning: bool = True
     show_compaction_notices: bool = False
+    command_predicate: Callable[[str], bool] | None = None
 
     def __init__(self, config: Any, bus: MessageBus):
         """
@@ -123,6 +129,10 @@ class BaseChannel(ABC):
         ``None`` keeps the global channel policy. Channels should override this
         only when their transport requires different defaults.
         """
+        return None
+
+    def turn_policy(self, message: InboundMessage, session_key: str, tools: ToolRegistry) -> TurnPolicy | None:
+        """Supply channel-owned tools and behavior for one admitted turn."""
         return None
 
     def should_retry_send_error(self, error: Exception) -> bool:

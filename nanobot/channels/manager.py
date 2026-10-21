@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 from loguru import logger
 
 from nanobot.bus.delivery import ChannelNotReadyError, DeliveryRejectedError
-from nanobot.bus.events import OutboundMessage
+from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.outbound_events import (
     ProgressEvent,
     RetryWaitEvent,
@@ -47,6 +47,8 @@ from nanobot.utils.restart import (
 
 if TYPE_CHECKING:
     from nanobot.agent.subagent import SubagentManager
+    from nanobot.agent.tools.registry import ToolRegistry
+    from nanobot.agent.turn_policy import TurnPolicy
     from nanobot.cron.service import CronService
     from nanobot.session.manager import SessionManager
     from nanobot.triggers.local_store import LocalTriggerStore
@@ -121,6 +123,7 @@ class ChannelManager:
         webui_subagent_manager: SubagentManager | None = None,
         webui_discard_session: Callable[[str], Awaitable[None]] | None = None,
         config_path: Path | None = None,
+        command_predicate: Callable[[str], bool] | None = None,
     ):
         if config_path is None:
             from nanobot.config.loader import get_config_path
@@ -146,6 +149,7 @@ class ChannelManager:
         self._webui_recovery_action = webui_recovery_action
         self._webui_subagent_manager = webui_subagent_manager
         self._webui_discard_session = webui_discard_session
+        self._command_predicate = command_predicate
         self.channels: dict[str, BaseChannel] = {}
         self._channel_owners: dict[str, str] = {}
         self._channel_runtime_specs: dict[str, tuple[str, str]] = {}
@@ -240,6 +244,7 @@ class ChannelManager:
             )
             kwargs["gateway"] = gateway
         channel = cls(section, self.bus, **kwargs)
+        channel.command_predicate = self._command_predicate
         if runtime_name and runtime_name != channel.name:
             channel.name = runtime_name
         progress_default, tool_hints_default = channel.progress_transport_defaults() or (
@@ -1207,6 +1212,11 @@ class ChannelManager:
                     await asyncio.sleep(delay)
                 except asyncio.CancelledError:
                     raise  # Propagate cancellation during sleep
+
+    def turn_policy(self, message: InboundMessage, session_key: str, tools: ToolRegistry) -> TurnPolicy | None:
+        channel_name = session_key.partition(":")[0]
+        channel = self.channels.get(channel_name)
+        return channel.turn_policy(message, session_key, tools) if channel is not None else None
 
     def get_channel(self, name: str) -> BaseChannel | None:
         """Get a channel by name."""

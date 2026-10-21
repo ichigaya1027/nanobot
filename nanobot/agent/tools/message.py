@@ -231,6 +231,7 @@ class MessageTool(Tool):
             metadata["_session_generation"] = request_ctx.session_generation
 
         msg = OutboundMessage(
+            tool_action=True,
             channel=channel,
             chat_id=chat_id,
             content=content,

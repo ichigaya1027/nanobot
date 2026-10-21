@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "圖片上限（位元組）"
+      },
+      "groupAgent_enabled": {
+        "label": "群組自主回覆",
+        "choices": {
+          "true": "開啟",
+          "false": "關閉"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "自主回覆群號"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "一般訊息視窗（秒）"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "定向訊息視窗（秒）"
       }
     }
   }

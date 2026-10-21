@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "Batas ukuran gambar (byte)"
+      },
+      "groupAgent_enabled": {
+        "label": "Balasan grup mandiri",
+        "choices": {
+          "true": "Aktif",
+          "false": "Mati"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "Grup balasan mandiri"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "Jeda pesan biasa (detik)"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "Jeda pesan tertuju (detik)"
       }
     }
   }

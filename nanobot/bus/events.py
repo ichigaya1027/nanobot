@@ -72,3 +72,4 @@ class OutboundMessage:
     event: "AgentEvent | None" = None
     delivery: DeliveryRequest | None = None
     delivery_id: str | None = None
+    tool_action: bool = False

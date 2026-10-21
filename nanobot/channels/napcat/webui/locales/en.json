@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "Image size limit (bytes)"
+      },
+      "groupAgent_enabled": {
+        "label": "Autonomous group replies",
+        "choices": {
+          "true": "On",
+          "false": "Off"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "Autonomous reply groups"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "Ordinary message window (seconds)"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "Directed message window (seconds)"
       }
     }
   }

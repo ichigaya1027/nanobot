@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "图片上限（字节）"
+      },
+      "groupAgent_enabled": {
+        "label": "群聊自主回复",
+        "choices": {
+          "true": "开启",
+          "false": "关闭"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "自主回复群号"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "普通消息窗口（秒）"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "定向消息窗口（秒）"
       }
     }
   }

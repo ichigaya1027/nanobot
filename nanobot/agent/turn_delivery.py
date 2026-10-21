@@ -207,6 +207,7 @@ class TurnDelivery:
     route: TurnRoute
     route_admission: TurnRouteAdmission | None = None
     enable_stream: bool = False
+    tool_only_output: bool = False
     delivery_message: InboundMessage = field(init=False)
     lifecycle_message: InboundMessage = field(init=False)
     _stream_base_id: str | None = field(init=False, default=None)
@@ -356,7 +357,7 @@ class TurnDelivery:
             stop_reason = cast(str | None, response.metadata.get("_stop_reason"))
         completed_channel = self.lifecycle_message.channel
         completed_chat_id = self.lifecycle_message.chat_id
-        if response is not None:
+        if response is not None and not self.tool_only_output:
             completed_channel = response.channel
             completed_chat_id = response.chat_id
             generation = self.route.metadata.get(HISTORY_GENERATION_METADATA_KEY)
@@ -407,14 +408,15 @@ class TurnDelivery:
             )
 
     async def fail(self, *, publish_completion: bool) -> None:
-        await self.bus.publish_outbound(
-            OutboundMessage(
-                channel=self.lifecycle_message.channel,
-                chat_id=self.lifecycle_message.chat_id,
-                content="Sorry, I encountered an error.",
-                metadata=dict(self.lifecycle_message.metadata or {}),
+        if not self.tool_only_output:
+            await self.bus.publish_outbound(
+                OutboundMessage(
+                    channel=self.lifecycle_message.channel,
+                    chat_id=self.lifecycle_message.chat_id,
+                    content="Sorry, I encountered an error.",
+                    metadata=dict(self.lifecycle_message.metadata or {}),
+                )
             )
-        )
         if publish_completion:
             await self.runtime_event_publisher.turn_completed(
                 channel=self.lifecycle_message.channel,
@@ -438,6 +440,8 @@ class TurnDelivery:
         return f"{self._stream_base_id}:{self._stream_segment}"
 
     async def _publish_event(self, event: AgentEvent) -> None:
+        if self.tool_only_output:
+            return
         if isinstance(event, ResponseSourceEvent):
             self._response_source_seen = True
             self._response_source = event.source

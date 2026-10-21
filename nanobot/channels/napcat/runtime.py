@@ -10,6 +10,8 @@ import random
 import time
 import uuid
 from collections import deque
+from contextlib import nullcontext
+from dataclasses import replace
 from pathlib import Path
 from typing import Annotated, Any, Literal, cast
 
@@ -19,10 +21,23 @@ from pydantic import Field
 from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.client import connect as ws_connect
 
+from nanobot.agent.tools.registry import ToolRegistry
+from nanobot.agent.turn_policy import TurnPolicy
 from nanobot.bus.delivery import ChannelNotReadyError, DeliveryRejectedError
-from nanobot.bus.events import OutboundMessage
+from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
+from nanobot.channels.napcat.group_agent import (
+    OBSERVATION_KEY,
+    GroupAgentConfig,
+    GroupMessage,
+    GroupObserver,
+)
+from nanobot.channels.napcat.group_tools import (
+    ActionOutcomeUnknownError,
+    ActionRejectedError,
+    group_turn_policy,
+)
 from nanobot.config.paths import get_media_dir
 from nanobot.config_base import Base
 from nanobot.events import ContextCompactionEvent
@@ -53,6 +68,7 @@ class NapcatConfig(Base):
     welcome_new_members: bool = True
     # Hard cap for inbound image downloads. Bigger images are dropped.
     max_image_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
+    group_agent: GroupAgentConfig = Field(default_factory=GroupAgentConfig)
 
 
 class NapcatChannel(BaseChannel):
@@ -79,6 +95,9 @@ class NapcatChannel(BaseChannel):
         self._processed_ids: deque[int] = deque(maxlen=2000)
         self._bot_outbound_ids: deque[int] = deque(maxlen=2000)
         self._background_tasks: set[asyncio.Task[None]] = set()
+        self.group_observer = GroupObserver(
+            self.config.group_agent, self.name, self.bus.publish_inbound, self._prepare_group_message,
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -176,6 +195,7 @@ class NapcatChannel(BaseChannel):
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._background_tasks.clear()
+        await self.group_observer.close()
 
     def _fail_pending(self, err: BaseException) -> None:
         for fut in self._pending.values():
@@ -213,7 +233,7 @@ class NapcatChannel(BaseChannel):
                 pass
 
         post_type = frame.get("post_type")
-        if post_type == "message":
+        if post_type in {"message", "message_sent"}:
             self._create_background_task(self._on_message(frame), "message")
         elif post_type == "notice":
             self._create_background_task(self._on_notice(frame), "notice")
@@ -238,6 +258,12 @@ class NapcatChannel(BaseChannel):
     # ------------------------------------------------------------------
 
     async def _on_message(self, ev: dict[str, Any]) -> None:
+        group_id = str(ev.get("group_id", ""))
+        if ev.get("message_type") == "group" and self.group_observer.enabled(group_id):
+            await self._observe_group(ev)
+            return
+        if ev.get("post_type") == "message_sent":
+            return
         msg_id = ev.get("message_id")
         if isinstance(msg_id, int):
             if msg_id in self._processed_ids:
@@ -439,6 +465,10 @@ class NapcatChannel(BaseChannel):
     # ------------------------------------------------------------------
 
     async def send(self, msg: OutboundMessage) -> None:
+        kind, _, target = msg.chat_id.partition(":")
+        autonomous_group = kind == "group" and self.group_observer.enabled(target)
+        if autonomous_group and not msg.tool_action:
+            return
         if isinstance(msg.event, ContextCompactionEvent) and not (
             msg.event.notify or self.show_compaction_notices
         ):
@@ -446,7 +476,6 @@ class NapcatChannel(BaseChannel):
         if self._ws is None:
             raise ChannelNotReadyError("napcat: not connected")
 
-        kind, _, target = msg.chat_id.partition(":")
         if kind not in ("private", "group") or not target:
             raise DeliveryRejectedError("napcat: invalid chat_id")
 
@@ -467,11 +496,83 @@ class NapcatChannel(BaseChannel):
             params["message_type"] = "private"
             params["user_id"] = int(target)
 
-        resp = await self._call_action("send_msg", params)
-        raw_data = resp.get("data")
-        data = cast(dict[str, Any], raw_data) if isinstance(raw_data, dict) else {}
-        if (mid := data.get("message_id")) is not None:
-            self._bot_outbound_ids.append(int(mid))
+        with self.group_observer.sending(target) if autonomous_group else nullcontext():
+            resp = await self._call_action("send_msg", params)
+            raw_data = resp.get("data")
+            data = cast(dict[str, Any], raw_data) if isinstance(raw_data, dict) else {}
+            if (mid := data.get("message_id")) is not None:
+                self._bot_outbound_ids.append(int(mid))
+                if autonomous_group:
+                    self.group_observer.acknowledged(target, str(mid))
+
+    async def _observe_group(self, event: dict[str, Any]) -> None:
+        received_at = time.monotonic()
+        if self.group_observer.seen(str(event.get("group_id", "")), str(event.get("message_id", ""))):
+            return
+        own = event.get("post_type") == "message_sent" or str(event.get("user_id")) == str(self._self_id)
+        if not own and not self.is_allowed(str(event.get("user_id", ""))):
+            return
+        segments = self._normalize_segments(event.get("message"))
+        text, _images, mentioned, reply_id = self._parse_segments(segments)
+        directed = mentioned or (reply_id is not None and reply_id in self._bot_outbound_ids)
+        if not own and reply_id is not None and not directed:
+            try:
+                response = await self._call_action("get_msg", {"message_id": reply_id})
+                data = response.get("data")
+                directed = (
+                    isinstance(data, dict)
+                    and str(cast(dict[str, Any], data).get("user_id")) == str(self._self_id)
+                    and str(cast(dict[str, Any], data).get("group_id")) == str(event.get("group_id"))
+                )
+            except (RuntimeError, TimeoutError, OSError) as error:
+                logger.debug("Could not identify reply target: {}", error)
+        raw = {**event, "message": segments}
+        message = GroupMessage.parse(raw)
+        self.group_observer.channel = self.name
+        # Commands remain owned by the gateway command dispatcher.
+        if not own and self.command_predicate is not None and self.command_predicate(text):
+            self.group_observer.acknowledged(message.group_id, message.message_id)
+            await self._handle_message(
+                sender_id=message.sender_id, chat_id=f"group:{message.group_id}", content=text,
+                session_key=f"{self.name}:group:{message.group_id}",
+                metadata={OBSERVATION_KEY: [message.wire()], "is_group": True},
+            )
+            return
+        self.group_observer.observe(message, own=own, directed=directed, received_at=received_at)
+
+    async def _prepare_group_message(self, message: GroupMessage) -> GroupMessage:
+        _text, images, _mentioned, _reply = self._parse_segments(message.segments)
+        media: list[str] = []
+        for image in images:
+            path = await self._download_image(image)
+            if path:
+                media.append(path)
+        return replace(message, media=tuple(media))
+
+    async def _group_action(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        try:
+            response = await self._call_action(action, params)
+        except (ActionRejectedError, ChannelNotReadyError):
+            raise
+        except (RuntimeError, TimeoutError, OSError) as error:
+            raise ActionOutcomeUnknownError(str(error)) from error
+        if action == "send_msg":
+            data = response.get("data")
+            if isinstance(data, dict) and cast(dict[str, Any], data).get("message_id") is not None:
+                self._bot_outbound_ids.append(int(cast(dict[str, Any], data)["message_id"]))
+        return response
+
+    def turn_policy(self, message: InboundMessage, session_key: str, tools: ToolRegistry) -> TurnPolicy | None:
+        prefix = f"{self.name}:group:"
+        if not session_key.startswith(prefix):
+            return None
+        group_id = session_key[len(prefix):]
+        if not self.group_observer.enabled(group_id):
+            return None
+        return group_turn_policy(
+            message, group_id, self.name, tools, self._group_action,
+            self._build_image_segment, self.group_observer,
+        )
 
     async def _build_image_segment(self, ref: str) -> dict[str, Any] | None:
         ref = (ref or "").strip()
@@ -499,7 +600,7 @@ class NapcatChannel(BaseChannel):
         timeout: float = _ACTION_TIMEOUT,
     ) -> dict[str, Any]:
         if self._ws is None:
-            raise RuntimeError("napcat: not connected")
+            raise ChannelNotReadyError("napcat: not connected")
         echo = uuid.uuid4().hex
         loop = asyncio.get_running_loop()
         fut: asyncio.Future[dict[str, Any]] = loop.create_future()
@@ -512,7 +613,7 @@ class NapcatChannel(BaseChannel):
             status = resp.get("status")
             retcode = resp.get("retcode")
             if (status and status != "ok") or (retcode not in (None, 0)):
-                raise RuntimeError(
+                raise ActionRejectedError(
                     f"napcat: action {action} failed status={status!r} retcode={retcode!r}"
                 )
             return resp

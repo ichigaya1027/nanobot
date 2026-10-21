@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "Giới hạn ảnh (byte)"
+      },
+      "groupAgent_enabled": {
+        "label": "Tự chủ trả lời nhóm",
+        "choices": {
+          "true": "Bật",
+          "false": "Tắt"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "Nhóm tự chủ trả lời"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "Thời gian chờ tin nhắn thường (giây)"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "Thời gian chờ tin nhắn trực tiếp (giây)"
       }
     }
   }

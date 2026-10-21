@@ -692,6 +692,30 @@ nanobot plugins enable napcat
 | `groupPolicyOverrides` | Optional per-group overrides for `groupPolicy`, keyed by group id (as a string). Each value takes the same shape as `groupPolicy` (`"mention"`, `"open"`, or a float). Groups not listed fall back to `groupPolicy`. |
 | `welcomeNewMembers` | When true, `notice.group_increase` events are pushed to the bus as a synthetic message so the agent can greet new joiners. |
 | `maxImageBytes` | Hard cap (in bytes) for inbound image downloads. Defaults to 20 MB. Larger images are dropped with a warning. |
+| `groupAgent` | Optional autonomous group replies. Enable for explicit group IDs and configure the ordinary and directed batch windows. See below. |
+
+**Autonomous group replies**
+
+In the NapCat channel settings, enable **Autonomous group replies**, enter the target groups and batching windows, or merge this object into `channels.napcat`:
+
+```json
+{
+  "groupAgent": {
+    "enabled": true,
+    "groups": ["123456789"],
+    "batchSeconds": 120,
+    "directedBatchSeconds": 10
+  }
+}
+```
+
+Each listed group has its own agent session. Authorized messages accumulate in a fixed window starting with the first message; later ordinary messages do not extend it. A direct mention or reply to the bot advances the deadline to at most `directedBatchSeconds` from arrival. Mature batches steer an active run or start a new one. `allowFrom` still authorizes each sender; other groups retain `groupPolicy`.
+
+The agent chooses whether to send, quote a message, react, poke a participant, or stay silent through QQ tools. Ordinary assistant text and internal progress are not posted to these groups. Action tools accept `end_response`: after the current model response's entire tool group succeeds, an ending request finishes without another model call. Any failed call returns the full results to the model for handling. Explicit chat commands retain the gateway's command responses.
+
+Enable `reportSelfMessage` on the NapCat WebSocket server to observe messages manually sent from the same QQ account. Self messages are background observations and do not wake the agent. Tool receipts and self events are deduplicated regardless of their arrival order.
+
+`get_message`, `get_chat_history`, and `search_chat_history` query NapCat directly. Search scans bounded history pages and reports coverage and a continuation anchor. NapCat may be unable to retrieve old IDs, recalled messages, or expired media; a failed or partial read is reported instead of treated as complete history. This mode keeps normal agent session history, without creating a separate long-term group chat archive. Pending batches remain in memory; restarts do not replay them, and reconnects do not automatically backfill missed messages. The agent can query the missed interval when it needs that context.
 
 </details>
 

@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "Limite d’image (octets)"
+      },
+      "groupAgent_enabled": {
+        "label": "Réponses autonomes en groupe",
+        "choices": {
+          "true": "Activé",
+          "false": "Désactivé"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "Groupes avec réponses autonomes"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "Délai des messages ordinaires (secondes)"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "Délai des messages directs (secondes)"
       }
     }
   }

@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "画像の上限（バイト）"
+      },
+      "groupAgent_enabled": {
+        "label": "グループの自律応答",
+        "choices": {
+          "true": "オン",
+          "false": "オフ"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "自律応答するグループ"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "通常メッセージの待機時間（秒）"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "宛先指定メッセージの待機時間（秒）"
       }
     }
   }

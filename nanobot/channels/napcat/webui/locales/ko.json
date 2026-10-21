@@ -35,6 +35,22 @@
       },
       "maxImageBytes": {
         "label": "이미지 크기 상한(바이트)"
+      },
+      "groupAgent_enabled": {
+        "label": "그룹 자율 응답",
+        "choices": {
+          "true": "켜기",
+          "false": "끄기"
+        }
+      },
+      "groupAgent_groups": {
+        "label": "자율 응답 그룹"
+      },
+      "groupAgent_batchSeconds": {
+        "label": "일반 메시지 대기 시간(초)"
+      },
+      "groupAgent_directedBatchSeconds": {
+        "label": "직접 지정 메시지 대기 시간(초)"
       }
     }
   }

@@ -844,8 +844,11 @@ def _run_claimed_gateway(
         webui_recovery_action=recovery.handle_action,
         webui_subagent_manager=agent.subagents,
         webui_discard_session=agent.discard_session,
+        command_predicate=agent.commands.is_dispatchable_command,
         config_path=Path(config_path),
     )
+
+    agent.turn_policy_provider = channels.turn_policy
 
     async def _pick_heartbeat_target() -> tuple[str, str]:
         """Pick a routable channel/chat target for heartbeat-triggered messages."""

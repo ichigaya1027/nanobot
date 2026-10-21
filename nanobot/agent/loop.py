@@ -44,6 +44,7 @@ from nanobot.agent.turn_delivery import (
 )
 from nanobot.agent.turn_delivery import TurnRoute as TurnRoute
 from nanobot.agent.turn_hooks import AgentTurnHookSpec, build_agent_turn_hook
+from nanobot.agent.turn_policy import TurnPolicy, TurnPolicyProvider
 from nanobot.bus.events import (
     INBOUND_META_RUNTIME_CONTROL,
     INBOUND_META_TURN_ID,
@@ -190,6 +191,7 @@ class TurnContext:
     hook_factories: list[AgentTurnHookFactory] = field(default_factory=list)
     turn_scopes: list[AbstractContextManager[Any]] = field(default_factory=list)
     tools: ToolRegistry | None = None
+    policy: TurnPolicy | None = None
 
     turn_wall_started_at: float = field(default_factory=time.time)
     visible_run_started_at: float | None = None
@@ -416,6 +418,7 @@ class AgentLoop:
         self._unified_session = unified_session
         self._running = False
         self._runtime_context_providers: list[RuntimeContextProvider] = []
+        self.turn_policy_provider: TurnPolicyProvider | None = None
         self._active_tasks: dict[str, set[asyncio.Task[Any]]] = {}
         self._discarding_sessions: set[str] = set()
         self._background_tasks: set[asyncio.Task[Any]] = set()
@@ -1103,6 +1106,8 @@ class AgentLoop:
                     break
 
             async def _to_user_message(pending_msg: InboundMessage) -> dict[str, Any]:
+                if request_ctx.turn_policy is not None and request_ctx.turn_policy.observe_input is not None:
+                    request_ctx.turn_policy.observe_input(pending_msg)
                 content = pending_msg.content
                 image_paths = pending_msg.media if pending_msg.media else None
                 if image_paths:
@@ -1252,6 +1257,7 @@ class AgentLoop:
             channel=request_ctx.channel,
             workspace=effective_scope.project_path,
             include_memory=session.policy.persist if session is not None else True,
+            instructions=request_ctx.turn_policy.instructions if request_ctx.turn_policy else "",
         )
         if request_context is None:
             request_ctx = dataclasses.replace(
@@ -1292,6 +1298,7 @@ class AgentLoop:
             )
 
         session_metadata = session.metadata if session is not None else None
+        tool_only_output = bool(request_ctx.turn_policy and request_ctx.turn_policy.tool_only_output)
         try:
             goal_inputs = turn_scope_stack.enter_context(GoalInputScope())
             for scope in turn_scopes or ():
@@ -1325,6 +1332,7 @@ class AgentLoop:
                 transcript_builder=transcript_builder,
                 hook=hook,
                 concurrent_tools=True,
+                accept_empty_final=tool_only_output,
                 # Temporary turns use the governor's bounded in-memory results;
                 # never create durable spill files, even before discard/cancellation.
                 workspace=None if ephemeral else effective_scope.project_path,
@@ -1348,10 +1356,12 @@ class AgentLoop:
                 injection_callback=_drain_pending,
                 terminal_injection_callback=_wait_for_pending,
                 continuation_callback=_goal_continue,
-                finalize_on_max_iterations=turn_continuation.should_finalize_on_max_iterations(
-                    pending_queue_available=pending_queue is not None and session is not None,
-                    session_metadata=session_metadata,
-                    message_metadata=request_metadata,
+                finalize_on_max_iterations=(
+                    not tool_only_output and turn_continuation.should_finalize_on_max_iterations(
+                        pending_queue_available=pending_queue is not None and session is not None,
+                        session_metadata=session_metadata,
+                        message_metadata=request_metadata,
+                    )
                 ),
                 provider_state=provider_state,
                 llm_usage_source=source_from_request(
@@ -2104,6 +2114,13 @@ class AgentLoop:
                     restricted.register(tool)
             tools = restricted
         ctx.tools = tools
+        if self.turn_policy_provider is not None:
+            ctx.policy = self.turn_policy_provider(msg, ctx.session_key, tools)
+            if ctx.policy is not None:
+                ctx.tools = ctx.policy.tools
+                ctx.delivery.tool_only_output = ctx.policy.tool_only_output
+                for name in session.policy.disabled_tools:
+                    ctx.tools.unregister(name)
 
         if ctx.kind is TurnKind.SYSTEM:
             logger.info("Processing system message from {}", msg.sender_id)
@@ -2172,6 +2189,9 @@ class AgentLoop:
             command_matched = False
         ctx.turn_scopes.append(GoalInputScope(ctx.msg))
         if result is not None:
+            if ctx.policy is not None and ctx.policy.tool_only_output:
+                result = dataclasses.replace(result, tool_action=True)
+                ctx.delivery.tool_only_output = False
             ctx.outbound = result
             if cmd_ctx.raw.lower() == "/new":
                 current = await self.sessions.state.get_header(ctx.session_key)
@@ -2242,6 +2262,8 @@ class AgentLoop:
         await ctx.delivery.runtime_admitted(runtime)
 
         ctx.request_context = await self._request_context_for_turn(ctx)
+        if ctx.policy is not None:
+            ctx.request_context = dataclasses.replace(ctx.request_context, turn_policy=ctx.policy)
         if ctx.kind is TurnKind.USER:
             ctx.runtime_context_blocks = await self._resolve_runtime_context_for_turn(ctx)
         staged_provider_state = False
@@ -2335,6 +2357,12 @@ class AgentLoop:
         ctx.summary_checkpoint = result.summary_checkpoint
         ctx.provider_compaction_applied = result.provider_compaction_applied
         ctx.stop_reason = result.stop_reason
+        if ctx.policy is not None:
+            ctx.suppress_response = ctx.policy.tool_only_output
+            if ctx.policy.completed is not None:
+                ctx.policy.completed()
+        if result.stop_reason == "tool_response_ended":
+            ctx.suppress_response = True
         ctx.failure_error_kind = result.failure_error_kind
         if (
             ctx.kind is TurnKind.USER

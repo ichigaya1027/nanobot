@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from nanobot.agent.tools.exec_session import ExecSessionManager
     from nanobot.agent.tools.file_state import FileStates
     from nanobot.agent.tools.runtime_control import RuntimeControl
+    from nanobot.agent.turn_policy import TurnPolicy
     from nanobot.bus.queue import MessageBus
     from nanobot.config.schema import ProvidersConfig, ToolsConfig
     from nanobot.cron.service import CronService
@@ -47,6 +48,7 @@ class RequestContext:
     persist_session: bool = True
     # Effective tool scope; injected inputs retain the active run's scope.
     workspace_scope: WorkspaceScope | None = None
+    turn_policy: TurnPolicy | None = None
 
 
 @runtime_checkable
