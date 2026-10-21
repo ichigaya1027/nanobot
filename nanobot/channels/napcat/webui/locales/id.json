@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "Pengguna diizinkan",
-        "placeholder": "ID QQ, dipisahkan koma"
+        "label": "Pengguna obrolan pribadi",
+        "placeholder": "ID QQ; kosong: hanya yang disetujui lewat pairing; *: semua"
+      },
+      "allowGroups": {
+        "label": "Grup yang diizinkan",
+        "placeholder": "ID grup dipisahkan koma; kosong: tidak ada grup"
       },
       "groupPolicyOverrides": {
         "label": "Pengecualian grup (JSON)"

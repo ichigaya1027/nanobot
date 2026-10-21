@@ -19,6 +19,7 @@ export default {
         { key: "channels.napcat.groupAgent.batchSeconds", section: "behavior" },
         { key: "channels.napcat.groupAgent.directedBatchSeconds", section: "behavior" },
         { key: "channels.napcat.allowFrom", section: "access" },
+        { key: "channels.napcat.allowGroups", section: "access" },
       ],
     },
   },

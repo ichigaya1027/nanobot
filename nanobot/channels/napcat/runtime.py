@@ -62,6 +62,7 @@ class NapcatConfig(Base):
     ws_url: str = "ws://127.0.0.1:3001"
     access_token: str = ""
     allow_from: list[str] = Field(default_factory=list)
+    allow_groups: list[str] = Field(default_factory=list)
     group_policy: GroupPolicy = "mention"
     # Per-group overrides keyed by stringified group_id, e.g. {"123456": "open"}.
     # Falls back to `group_policy` when a group_id isn't listed.
@@ -101,6 +102,19 @@ class NapcatChannel(BaseChannel):
         self.group_observer = GroupObserver(
             self.config.group_agent, self.name, self.bus.publish_inbound, self._prepare_group_message,
         )
+
+    def _is_group_allowed(self, group_id: str) -> bool:
+        return group_id in self.config.allow_groups
+
+    def is_message_allowed(
+        self, sender_id: str, chat_id: str, authorization_id: str | None = None,
+    ) -> bool:
+        kind, _, target = chat_id.partition(":")
+        if kind == "group":
+            return self._is_group_allowed(target)
+        if kind == "private":
+            return super().is_message_allowed(sender_id, chat_id, authorization_id)
+        raise ValueError(f"napcat: invalid chat_id {chat_id!r}")
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -261,8 +275,18 @@ class NapcatChannel(BaseChannel):
     # ------------------------------------------------------------------
 
     async def _on_message(self, ev: dict[str, Any]) -> None:
+        message_type = ev.get("message_type")
+        user_id = ev.get("user_id")
+        if user_id is None or message_type not in ("group", "private"):
+            return
+        if message_type == "group" and ev.get("group_id") is None:
+            return
         group_id = str(ev.get("group_id", ""))
-        if ev.get("message_type") == "group" and self.group_observer.enabled(group_id):
+        chat_id = f"group:{group_id}" if message_type == "group" else f"private:{user_id}"
+        if not self.is_message_allowed(str(user_id), chat_id):
+            logger.warning("napcat: access denied for sender {} in {}", user_id, chat_id)
+            return
+        if message_type == "group" and self.group_observer.enabled(group_id):
             await self._observe_group(ev)
             return
         if ev.get("post_type") == "message_sent":
@@ -272,11 +296,6 @@ class NapcatChannel(BaseChannel):
             if msg_id in self._processed_ids:
                 return
             self._processed_ids.append(msg_id)
-
-        message_type = ev.get("message_type")
-        user_id = ev.get("user_id")
-        if user_id is None or message_type not in ("group", "private"):
-            return
 
         segments = self._normalize_segments(ev.get("message"))
         text, images, mentioned_self, reply_to_id = self._parse_segments(segments)
@@ -291,10 +310,6 @@ class NapcatChannel(BaseChannel):
         nickname = sender.get("card") or sender.get("nickname")
 
         if message_type == "group":
-            group_id = ev.get("group_id")
-            if group_id is None:
-                return
-
             replying_to_bot = (
                 isinstance(reply_to_id, int) and reply_to_id in self._bot_outbound_ids
             )
@@ -305,14 +320,12 @@ class NapcatChannel(BaseChannel):
             ):
                 return
 
-            chat_id = f"group:{group_id}"
             content = self._format_group_content(
                 text=text,
                 nickname=cast(str, nickname),
                 user_id=user_id,
             )
         else:
-            chat_id = f"private:{user_id}"
             content = text
 
         if not content and not media_paths:
@@ -420,12 +433,14 @@ class NapcatChannel(BaseChannel):
 
     async def _on_notice(self, ev: dict[str, Any]) -> None:
         group_id = str(ev.get("group_id", ""))
+        if not self._is_group_allowed(group_id):
+            return
         if (
             ev.get("notice_type") == "notify" and ev.get("sub_type") == "poke"
             and self._self_id is not None and str(ev.get("target_id")) == str(self._self_id)
             and self.group_observer.enabled(group_id)
         ):
-            if ev.get("user_id") is None or not self.is_allowed(str(ev["user_id"])):
+            if ev.get("user_id") is None:
                 return
             await self._observe_group({
                 **ev, "message_type": "group", "message_id": f"notice:{uuid.uuid4().hex}",
@@ -450,9 +465,6 @@ class NapcatChannel(BaseChannel):
 
         nickname = await self._lookup_member_name(group_id_int, user_id_int)
 
-        # Note: this routes through is_allowed(). For group bots set
-        # `allow_from: ["*"]` (or include the joining user's id) for welcomes
-        # to fire — same trust model as a regular inbound message.
         await self._handle_message(
             sender_id=str(user_id),
             chat_id=f"group:{group_id}",
@@ -483,6 +495,10 @@ class NapcatChannel(BaseChannel):
 
     async def send(self, msg: OutboundMessage) -> None:
         kind, _, target = msg.chat_id.partition(":")
+        if kind not in ("private", "group") or not target:
+            raise DeliveryRejectedError("napcat: invalid chat_id")
+        if kind == "group" and not self._is_group_allowed(target):
+            raise DeliveryRejectedError(f"napcat: group {target} is not allowed")
         autonomous_group = kind == "group" and self.group_observer.enabled(target)
         if autonomous_group and not msg.tool_action:
             return
@@ -492,9 +508,6 @@ class NapcatChannel(BaseChannel):
             return
         if self._ws is None:
             raise ChannelNotReadyError("napcat: not connected")
-
-        if kind not in ("private", "group") or not target:
-            raise DeliveryRejectedError("napcat: invalid chat_id")
 
         segments: list[dict[str, Any]] = []
         for ref in msg.media or []:
@@ -527,8 +540,6 @@ class NapcatChannel(BaseChannel):
         if self.group_observer.seen(str(event.get("group_id", "")), str(event.get("message_id", ""))):
             return
         own = event.get("post_type") == "message_sent" or str(event.get("user_id")) == str(self._self_id)
-        if not own and not self.is_allowed(str(event.get("user_id", ""))):
-            return
         segments = self._normalize_segments(event.get("message"))
         text, _images, mentioned, reply_id = self._parse_segments(segments)
         directed = mentioned or any(
@@ -689,6 +700,8 @@ class NapcatChannel(BaseChannel):
         if not session_key.startswith(prefix):
             return None
         group_id = session_key[len(prefix):]
+        if not self._is_group_allowed(group_id):
+            raise PermissionError(f"napcat: group {group_id} is not allowed")
         if not self.group_observer.enabled(group_id):
             return None
         return group_turn_policy(

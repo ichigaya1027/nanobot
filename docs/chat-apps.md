@@ -673,6 +673,7 @@ nanobot plugins enable napcat
       "wsUrl": "ws://127.0.0.1:3001",
       "accessToken": "YOUR_WEBSOCKET_TOKEN",
       "allowFrom": ["*"],
+      "allowGroups": ["123456789", "987654321"],
       "groupPolicy": "mention",
       "groupPolicyOverrides": {
         "123456789": "open",
@@ -687,7 +688,8 @@ nanobot plugins enable napcat
 | Option | What it does |
 |--------|--------------|
 | `wsUrl` | Napcat forward-WebSocket endpoint. Bearer auth via `accessToken` is sent in the `Authorization` header. |
-| `allowFrom` | QQ numbers permitted to talk to the bot. `["*"]` = anyone. Required `["*"]` (or include the joining user) for `welcomeNewMembers` to fire. |
+| `allowFrom` | 私聊允许的 QQ 用户。`["*"]` 允许所有用户；空名单仅允许已有配对授权的用户。群聊不按此字段筛选成员。 |
+| `allowGroups` | 允许接收消息、执行群会话和发送消息的群号列表。获准群内任意成员均可参与。缺省或空名单拒绝全部群聊，只支持明确群号。 |
 | `groupPolicy` | `"mention"` (default) — reply only when @-mentioned or replying to the bot's own message. `"open"` — reply to every group message. A float `p` in `[0.0, 1.0]` — @mentions and replies-to-bot always reply; every other group message replies with probability `p` (so `0.0` ≡ `"mention"`, `1.0` ≡ `"open"`). Private chats always reply. |
 | `groupPolicyOverrides` | Optional per-group overrides for `groupPolicy`, keyed by group id (as a string). Each value takes the same shape as `groupPolicy` (`"mention"`, `"open"`, or a float). Groups not listed fall back to `groupPolicy`. |
 | `welcomeNewMembers` | When true, `notice.group_increase` events are pushed to the bus as a synthetic message so the agent can greet new joiners. |
@@ -700,6 +702,7 @@ In the NapCat channel settings, enable **Autonomous group replies**, enter the t
 
 ```json
 {
+  "allowGroups": ["123456789"],
   "groupAgent": {
     "enabled": true,
     "groups": ["123456789"],
@@ -709,7 +712,9 @@ In the NapCat channel settings, enable **Autonomous group replies**, enter the t
 }
 ```
 
-Each listed group has its own agent session. Authorized messages accumulate in a fixed window starting with the first message; later ordinary messages do not extend it. A direct mention or reply to the bot advances the deadline to at most `directedBatchSeconds` from arrival. Mature batches steer an active run or start a new one. `allowFrom` still authorizes each sender; other groups retain `groupPolicy`.
+每个自主群拥有独立的 Agent 会话。只有 `allowGroups` 中的群才会处理消息，群内任意成员都可参与；其中列入 `groupAgent.groups` 的群采用自主合批模式，其余获准群继续使用 `groupPolicy`。消息从首条开始按固定窗口积累，后续普通消息不延长窗口。直接提及或回复机器人会将截止时间提前至到达后最多 `directedBatchSeconds` 秒。成熟批次会 steer 当前运行，或启动新运行。
+
+旧配置需要补填 `allowGroups`，不会从 `groupAgent.groups` 自动迁移群名单。修改名单时，先停止 Gateway，修改配置后再启动；单独关闭 NapCat 连接不会终止已运行的模型和工具任务。群授权检查由运行中的渠道实例提供，渠道停用后的旧会话模型执行不属于这项检查的覆盖范围。私聊发送保留现有行为，`allowFrom` 只限制私聊入站。
 
 Group batches and message query results use the same compact line format: one group header, then a chronological line per message. Each block starts with a full UTC date and time to the minute, sender ID and name. Repeated times within a minute and consecutive identical sender identities are omitted; a new minute shows the time, and a new day restores the full date. Message IDs and reply IDs are always retained. Each batch, steer input, and query result resets this shorthand. Mentions, image references, and other message components remain available. Structured platform records, including second-resolution timestamps, stay internal for tool target validation; normal nanobot session history and context compaction still apply.
 

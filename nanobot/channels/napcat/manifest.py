@@ -9,6 +9,7 @@ SETUP_SPEC = ChannelSetupSpec(
         "wsUrl": field(default="ws://127.0.0.1:3001"),
         "accessToken": field("secret"),
         "allowFrom": field("list"),
+        "allowGroups": field("list"),
         "groupPolicy": field("enum", choices=DIRECT_GROUP_POLICIES, default="mention"),
         "groupPolicyOverrides": field("json", default={}),
         "welcomeNewMembers": field("bool", default=True),

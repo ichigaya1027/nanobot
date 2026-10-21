@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "Allowed users",
-        "placeholder": "QQ IDs, comma separated"
+        "label": "Private chat users",
+        "placeholder": "QQ IDs; empty: approved pairs only; *: everyone"
+      },
+      "allowGroups": {
+        "label": "Allowed groups",
+        "placeholder": "Group IDs, comma separated; empty: no groups"
       },
       "groupPolicyOverrides": {
         "label": "Group exceptions (JSON)"

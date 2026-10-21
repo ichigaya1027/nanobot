@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "Người dùng được phép",
-        "placeholder": "ID QQ, phân tách bằng dấu phẩy"
+        "label": "Người dùng trò chuyện riêng",
+        "placeholder": "ID QQ; để trống: chỉ người đã ghép đôi; *: mọi người"
+      },
+      "allowGroups": {
+        "label": "Nhóm được phép",
+        "placeholder": "ID nhóm, phân cách bằng dấu phẩy; để trống: không nhóm nào"
       },
       "groupPolicyOverrides": {
         "label": "Ngoại lệ nhóm (JSON)"

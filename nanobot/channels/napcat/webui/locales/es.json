@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "Usuarios permitidos",
-        "placeholder": "ID de QQ separados por comas"
+        "label": "Usuarios de chat privado",
+        "placeholder": "ID de QQ; vacío: solo vinculados; *: todos"
+      },
+      "allowGroups": {
+        "label": "Grupos permitidos",
+        "placeholder": "ID de grupos separados por comas; vacío: ninguno"
       },
       "groupPolicyOverrides": {
         "label": "Excepciones de grupo (JSON)"

@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "허용 사용자",
-        "placeholder": "QQ ID, 쉼표로 구분"
+        "label": "개인 채팅 사용자",
+        "placeholder": "QQ ID; 비우면 페어링 승인 사용자만; *: 모두"
+      },
+      "allowGroups": {
+        "label": "허용 그룹",
+        "placeholder": "쉼표로 구분한 그룹 ID; 비우면 그룹 허용 안 함"
       },
       "groupPolicyOverrides": {
         "label": "그룹 예외(JSON)"

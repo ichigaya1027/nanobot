@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "許可ユーザー",
-        "placeholder": "QQ ID（カンマ区切り）"
+        "label": "個人チャットのユーザー",
+        "placeholder": "QQ ID；空欄：ペアリング承認済みのみ；*：全員"
+      },
+      "allowGroups": {
+        "label": "許可グループ",
+        "placeholder": "グループID（カンマ区切り）；空欄：許可なし"
       },
       "groupPolicyOverrides": {
         "label": "グループの例外（JSON）"

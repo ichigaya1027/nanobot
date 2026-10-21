@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "允許使用者",
-        "placeholder": "QQ ID，以逗號分隔"
+        "label": "私聊使用者",
+        "placeholder": "QQ 號；留空僅允許已配對使用者；* 允許所有使用者"
+      },
+      "allowGroups": {
+        "label": "允許群聊",
+        "placeholder": "群號，以逗號分隔；留空不允許群聊"
       },
       "groupPolicyOverrides": {
         "label": "群聊例外（JSON）"

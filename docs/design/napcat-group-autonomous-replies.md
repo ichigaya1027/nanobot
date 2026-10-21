@@ -8,7 +8,7 @@
 
 复用 nanobot 的 Python gateway、AgentLoop、AgentRunner、会话队列、steer、工具加载、工作区权限和现有恢复机制。群观察和平台动作由 NapCat 渠道侧承接，执行与策略继续归 gateway。WebUI 和 TUI 只负责配置和展示。
 
-首期只在明确启用的 NapCat 群生效。未启用的群及私聊继续使用现有行为。每个启用群使用独立会话，避免被 `unified_session` 合并到其他群或私聊。
+自主模式只在明确启用且通过 `allowGroups` 授权的 NapCat 群生效。其他获准群按 `groupPolicy` 处理；私聊使用 `allowFrom` 和已有配对授权。每个自主群使用独立会话，避免被 `unified_session` 合并到其他群或私聊。
 
 ## 2. 已确认的行为
 
@@ -32,7 +32,7 @@
 
 ### 3.1 入站与 steer
 
-[NapCat 渠道](../../nanobot/channels/napcat/runtime.py) 当前按 `groupPolicy` 决定是否把单条消息送入 Agent。未触发的消息会直接返回，不能作为持续旁听上下文。自主模式需要在发送者授权后接收该群消息，分别决定是否观察和何时提交一批；未启用群保留原有触发策略。
+[NapCat 渠道](../../nanobot/channels/napcat/runtime.py) 先按 `allowGroups` 判断群范围，再决定采用自主模式或 `groupPolicy`。自主模式接收获准群内任意成员的消息，分别决定是否观察和何时提交一批；其余获准群保留原有触发策略。
 
 [AgentLoop](../../nanobot/agent/loop.py) 已有每会话唯一 worker、pending 队列、会话锁和并发预算。[AgentRunner](../../nanobot/agent/runner.py) 在下一次模型调用前读取待插入输入，并在普通最终正文返回后检查后续输入。新批次可以复用此路径，不需要另建模型或工具循环。
 
@@ -91,6 +91,7 @@ flowchart TD
 {
   "channels": {
     "napcat": {
+      "allowGroups": ["123456789"],
       "groupAgent": {
         "enabled": true,
         "groups": ["123456789"],
@@ -102,7 +103,7 @@ flowchart TD
 }
 ```
 
-默认不启用自主模式。启用后仅对 `groups` 明确列出的群生效；发送者授权仍使用现有渠道机制。`groupPolicy` 继续控制其他群；自主群的普通消息参与观察与攒批，不再按旧概率策略随机丢弃。
+默认不启用自主模式。群聊仅允许 `allowGroups` 中的群，空名单不允许任何群；获准群内任意成员均可参与。启用后，`groupAgent.groups` 明确列出的获准群使用自主模式，`groupPolicy` 继续控制其他获准群；自主群的普通消息参与观察与攒批，不再按旧概率策略随机丢弃。授权与配置应用方式见 [群聊与私聊授权方案](napcat-channel-authorization.md)。
 
 时间参数在配置边界校验。客户端只编辑配置，不持有批缓存、计时器或执行策略。配置变更按现有渠道配置应用生命周期生效。
 

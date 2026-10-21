@@ -20,8 +20,12 @@
         }
       },
       "allowFrom": {
-        "label": "Utilisateurs autorisés",
-        "placeholder": "ID QQ séparés par des virgules"
+        "label": "Utilisateurs en privé",
+        "placeholder": "ID QQ ; vide : utilisateurs appairés ; * : tous"
+      },
+      "allowGroups": {
+        "label": "Groupes autorisés",
+        "placeholder": "ID des groupes séparés par des virgules ; vide : aucun"
       },
       "groupPolicyOverrides": {
         "label": "Exceptions de groupe (JSON)"
