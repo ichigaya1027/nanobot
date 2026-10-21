@@ -25,8 +25,9 @@ _CRON_PARAMETERS = tool_parameters_schema(
     name=StringSchema("Job label; generated from message if omitted."),
     message=StringSchema(
         "REQUIRED when action='add': non-empty instruction to execute when the job triggers. "
-        "The final reply goes to the task's saved chat automatically. "
-        "Do not copy the current channel/chat ID or require a message tool call for that reply. "
+        "Nanobot normally delivers the final reply to the task's saved chat when ordinary assistant replies are allowed there. "
+        "Otherwise, follow that chat's existing output policy. "
+        "Do not copy the current channel or chat ID. "
         "Include other recipients only when the user requests separate sends."
     ),
     every_seconds=IntegerSchema(

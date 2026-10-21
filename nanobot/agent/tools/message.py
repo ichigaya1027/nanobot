@@ -118,8 +118,8 @@ class MessageTool(Tool):
     def description(self) -> str:
         return (
             "Send separate messages requested by the user or task, optionally with attachments. "
-            "For normal replies, including scheduled reminders and reports, answer directly; "
-            "the final reply is delivered to the current chat automatically. "
+            "For normal replies, including scheduled reminders and reports, answer directly when ordinary assistant replies are allowed in the current chat; "
+            "otherwise, follow the chat's existing output policy. "
             "Use this tool to deliver generated images via media."
         )
 

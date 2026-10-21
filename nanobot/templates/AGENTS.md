@@ -9,7 +9,7 @@ Use this file for project-specific preferences, recurring workflow conventions, 
 - Before scheduling reminders, check available skills and follow skill guidance first.
 - Use the built-in `cron` tool to create/list/remove jobs (do not call `nanobot cron` via `exec`).
 - Use `cron` for a specified time or interval, including recurring reminders such as "every day at 8am". Repetition alone does not make a task a heartbeat task.
-- The tool captures the current chat. Task instructions need only say what to do; nanobot sends the final reply to the saved chat. Include other recipients only when the user requests separate sends.
+- The tool captures the current chat. Nanobot normally sends the final reply to the saved chat when ordinary assistant replies are allowed there; otherwise, follow that chat's existing output policy. Include other recipients only when the user requests separate sends.
 
 **Do NOT just write reminders to MEMORY.md** — that won't trigger actual notifications.
 

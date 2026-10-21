@@ -42,7 +42,7 @@ The cron tool supports interval schedules, cron expressions, and one-time schedu
 
 Scheduled automations normally deliver the result back to the session where they were created. Use them for work that should run on a predictable schedule and report each run.
 
-Write what the task should do, such as "Remind me to drink water". nanobot sends the final reply to the task's saved chat. You do not need to put a channel, chat ID, or a `message` tool call in the instructions for that reply.
+Write what the task should do, such as "Remind me to drink water". nanobot normally sends the final reply to the task's saved chat when ordinary assistant replies are allowed there. Otherwise, the chat's existing output policy determines how the result is delivered. Do not put a channel or chat ID in the instructions.
 
 For separate sends, specify the recipients in the instructions. The agent can still use `message` to send to other chats, send to several recipients, or attach files. Existing tasks that explicitly request this tool remain supported.
 
