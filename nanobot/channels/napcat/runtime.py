@@ -437,15 +437,22 @@ class NapcatChannel(BaseChannel):
             return
         if (
             ev.get("notice_type") == "notify" and ev.get("sub_type") == "poke"
-            and self._self_id is not None and str(ev.get("target_id")) == str(self._self_id)
+            and self._self_id is not None
             and self.group_observer.enabled(group_id)
         ):
             if ev.get("user_id") is None:
                 return
+            poke: dict[str, Any] = {
+                "qq": str(ev["target_id"]),
+                "target_is_self": str(ev["target_id"]) == str(self._self_id),
+            }
+            if "raw_info" in ev:
+                poke["action"] = ev["raw_info"][2]["txt"]
+                poke["suffix"] = ev["raw_info"][4]["txt"]
             await self._observe_group({
                 **ev, "message_type": "group", "message_id": f"notice:{uuid.uuid4().hex}",
                 "targetable": False,
-                "message": [{"type": "poke", "data": {"qq": str(ev["target_id"]), "target_is_self": True}}],
+                "message": [{"type": "poke", "data": poke}],
             })
             return
         if ev.get("notice_type") != "group_increase" or not self.config.welcome_new_members:
@@ -608,6 +615,7 @@ class NapcatChannel(BaseChannel):
                         self._group_names[group] = str(group_data["group_name"])
             except (RuntimeError, TimeoutError, OSError) as error:
                 logger.debug("Could not retrieve group name: {}", error)
+        name = message.name or await self._member_name(group, message.sender_id)
         segments = deepcopy(message.segments)
         for segment in segments:
             data = segment.get("data")
@@ -620,6 +628,9 @@ class NapcatChannel(BaseChannel):
                     self._member_names[(group, user)] = str(data["name"])
                 else:
                     data["name"] = await self._member_name(group, user)
+            elif segment.get("type") == "poke" and "action" in data:
+                target_name = await self._member_name(group, str(data["qq"]))
+                data["text"] = f"{name}{data['action']}{target_name}{data['suffix']}"
             elif segment.get("type") == "reply" and data.get("id") is not None:
                 try:
                     response = await self._call_action("get_msg", {"message_id": data["id"]})
@@ -633,7 +644,6 @@ class NapcatChannel(BaseChannel):
                         })
                 except (ValueError, RuntimeError, TimeoutError, OSError) as error:
                     logger.debug("Could not enrich reply context: {}", error)
-        name = message.name or await self._member_name(group, message.sender_id)
         return replace(message, name=name, group_name=self._group_names.get(group, ""), segments=segments)
 
     async def _member_name(self, group: str, user: str) -> str:
