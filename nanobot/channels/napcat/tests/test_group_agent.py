@@ -40,7 +40,7 @@ def message(mid=1, user=7, text="hello", **extra):
 
 def channel():
     result = NapcatChannel(NapcatConfig(
-        allow_from=["7"], group_agent=GroupAgentConfig(enabled=True, groups=["100"]),
+        allow_from=["7"], allow_groups=["100"], group_agent=GroupAgentConfig(enabled=True, groups=["100"]),
     ), MessageBus())
     result._self_id = 42
     return result
@@ -110,7 +110,7 @@ async def test_own_echo_and_send_receipt_do_not_wake_or_duplicate(echo_first):
     await ch._on_message(message(2, user=8))
     await ch.group_observer.flush("100")
     batch = await ch.bus.consume_inbound()
-    assert [m["message_id"] for m in batch.metadata[OBSERVATION_KEY]] == ["1"]
+    assert [m["message_id"] for m in batch.metadata[OBSERVATION_KEY]] == ["1", "2"]
     assert batch.session_key == "napcat:group:100"
     await ch.stop()
 
@@ -415,7 +415,7 @@ async def test_registered_commands_bypass_window_but_other_slash_messages_are_ob
     loop.turn_policy_provider = ch.turn_policy
     ch.command_predicate = loop.commands.is_dispatchable_command
     try:
-        await ch._on_message(message(text="/help"))
+        await ch._on_message(message(user=8, text="/help"))
         command = await asyncio.wait_for(ch.bus.consume_inbound(), 1)
         response = await loop._process_message(command)
         assert response is not None and response.tool_action and response.content
@@ -423,7 +423,7 @@ async def test_registered_commands_bypass_window_but_other_slash_messages_are_ob
         ch._ws = MagicMock()
         await ch.send(response)
         ch._call_action.assert_awaited_once()
-        await ch._on_message(message(2, text="/ordinary-group-text"))
+        await ch._on_message(message(2, user=8, text="/ordinary-group-text"))
         assert ch.bus.inbound_size == 0
         await ch.group_observer.flush("100")
         batch = await ch.bus.consume_inbound()

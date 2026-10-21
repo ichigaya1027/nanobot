@@ -33,9 +33,8 @@ async def test_poking_bot_wakes_directed_observation_but_is_not_a_quote_target(t
               "user_id": 7, "target_id": 42, "time": 1700000000}
     try:
         await ch._on_notice({**notice, "target_id": 8})
-        await ch._on_notice({**notice, "user_id": 8})
         assert ch.bus.inbound_size == 0
-        await ch._on_notice(notice)
+        await ch._on_notice({**notice, "user_id": 8})
         batch = await asyncio.wait_for(ch.bus.consume_inbound(), 1)
         event = batch.metadata[OBSERVATION_KEY][0]
         assert "event: [poke @42]" in batch.content

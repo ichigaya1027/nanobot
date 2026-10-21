@@ -66,7 +66,7 @@ async def test_send_raises_while_websocket_is_not_connected() -> None:
 
 @pytest.mark.asyncio
 async def test_group_message_requires_mention_by_default() -> None:
-    channel = _channel(NapcatConfig(allow_from=["user1"], group_policy="mention"))
+    channel = _channel(NapcatConfig(allow_from=["user1"], allow_groups=["100"], group_policy="mention"))
     channel._self_id = 42
 
     await channel._on_message(
@@ -85,7 +85,7 @@ async def test_group_message_requires_mention_by_default() -> None:
 
 @pytest.mark.asyncio
 async def test_group_mention_routes_with_sender_label() -> None:
-    channel = _channel(NapcatConfig(allow_from=["user1"], group_policy="mention"))
+    channel = _channel(NapcatConfig(allow_from=["user1"], allow_groups=["100"], group_policy="mention"))
     channel._self_id = 42
 
     await channel._on_message(
