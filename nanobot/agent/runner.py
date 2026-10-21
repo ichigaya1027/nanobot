@@ -23,6 +23,7 @@ from nanobot.agent.context_governance import (
     TranscriptBuilder,
 )
 from nanobot.agent.hook import AgentHook, AgentHookContext, AgentRunHookContext
+from nanobot.agent.tools.base import ToolResult
 from nanobot.agent.tools.context import tool_log_content_allowed
 from nanobot.agent.tools.execution import execute_tool_calls
 from nanobot.agent.tools.registry import ToolRegistry
@@ -110,6 +111,7 @@ class AgentRunSpec:
     error_message: str | None = _DEFAULT_ERROR_MESSAGE
     max_iterations_message: str | None = None
     concurrent_tools: bool = False
+    accept_empty_final: bool = False
     workspace: Path | None = None
     session_key: str | None = None
     provider_retry_mode: str = "standard"
@@ -619,6 +621,14 @@ class AgentRunner:
                 empty_content_retries = 0
                 length_recovery_parts.clear()
                 await hook.after_iteration(context)
+                if (
+                    any(isinstance(result, ToolResult) and result.end_response for result in results)
+                    and all(event.get("status") == "ok" for event in new_events)
+                ):
+                    stop_reason = "tool_response_ended"
+                    context.stop_reason = stop_reason
+                    final_content = None
+                    break
                 continue
 
             if response.has_tool_calls:
@@ -633,6 +643,7 @@ class AgentRunner:
                 response.finish_reason
                 not in {"error", "length", "refusal", "content_filter"}
                 and is_blank_text(clean)
+                and not spec.accept_empty_final
             ):
                 empty_content_retries += 1
                 if empty_content_retries < _MAX_EMPTY_RETRIES:
@@ -671,7 +682,7 @@ class AgentRunner:
                 original_content = response.content
                 clean = hook.finalize_content(context, response.content)
 
-            if response.finish_reason == "length":
+            if response.finish_reason == "length" and not spec.accept_empty_final:
                 if len(length_recovery_parts) < _MAX_LENGTH_RECOVERIES:
                     length_recovery_parts.append(
                         _restore_outer_whitespace(clean or "", original_content)
@@ -736,7 +747,7 @@ class AgentRunner:
                 phase="after final response",
                 iteration=iteration,
                 allow_continuation=(
-                    response.finish_reason not in {"refusal", "content_filter"}
+                    not spec.accept_empty_final and response.finish_reason not in {"refusal", "content_filter"}
                 ),
                 wait_at_terminal=(
                     assistant_message is not None
@@ -780,6 +791,11 @@ class AgentRunner:
                 failure_error_kind = LLMProvider.public_error_kind(response)
                 break
             if is_blank_text(clean):
+                if spec.accept_empty_final:
+                    stop_reason = "empty_final_response"
+                    context.stop_reason = stop_reason
+                    await hook.after_iteration(context)
+                    break
                 final_content = EMPTY_FINAL_RESPONSE_MESSAGE
                 stop_reason = "empty_final_response"
                 error = final_content
