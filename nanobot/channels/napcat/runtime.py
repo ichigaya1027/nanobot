@@ -445,7 +445,7 @@ class NapcatChannel(BaseChannel):
             await self._observe_group({
                 **ev, "message_type": "group", "message_id": f"notice:{uuid.uuid4().hex}",
                 "targetable": False,
-                "message": [{"type": "poke", "data": {"qq": str(ev["target_id"])}}],
+                "message": [{"type": "poke", "data": {"qq": str(ev["target_id"]), "target_is_self": True}}],
             })
             return
         if ev.get("notice_type") != "group_increase" or not self.config.welcome_new_members:

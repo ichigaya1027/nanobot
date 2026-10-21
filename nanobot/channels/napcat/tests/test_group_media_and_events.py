@@ -37,7 +37,7 @@ async def test_poking_bot_wakes_directed_observation_but_is_not_a_quote_target(t
         await ch._on_notice({**notice, "user_id": 8})
         batch = await asyncio.wait_for(ch.bus.consume_inbound(), 1)
         event = batch.metadata[OBSERVATION_KEY][0]
-        assert "event: [poke @42]" in batch.content
+        assert "event: [poke you]" in batch.content
         assert event["message_id"] not in batch.content
         policy = ch.turn_policy(batch, batch.session_key, ToolRegistry())
         assert policy is not None
