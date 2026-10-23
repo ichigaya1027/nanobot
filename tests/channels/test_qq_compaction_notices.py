@@ -101,10 +101,9 @@ def test_config_accepts_camel_case_override() -> None:
 def test_qq_inherits_global_unless_legacy_override_is_explicit(
     tmp_path, global_value, override, typed, legacy_string,
 ):
-    manager = ChannelManager.__new__(ChannelManager)
-    manager.config = Config()
-    manager.config.channels.show_compaction_notices = global_value
-    manager.bus = MessageBus()
+    config = Config()
+    config.channels.show_compaction_notices = global_value
+    manager = ChannelManager(config, MessageBus(), config_path=tmp_path / "config.json")
     section = {"appId": "a", "secret": "s", "mediaDir": str(tmp_path)}
     if override is not None:
         section["showCompactionNotices"] = str(override).lower() if legacy_string else override

@@ -296,15 +296,14 @@ class TestProgressFiltering:
         assert manager._should_send_progress("mock", tool_hint=False) is False
         assert manager._should_send_progress("mock", tool_hint=True) is False
 
-    def test_channel_config_defaults_do_not_override_global_policy(self, bus):
-        manager = ChannelManager.__new__(ChannelManager)
-        manager.config = Config.model_validate({
+    def test_channel_config_defaults_do_not_override_global_policy(self, bus, tmp_path):
+        config = Config.model_validate({
             "channels": {
                 "sendProgress": False,
                 "sendToolHints": False,
             },
         })
-        manager.bus = bus
+        manager = ChannelManager(config, bus, config_path=tmp_path / "config.json")
 
         channel = manager._build_channel(
             "mattermost",

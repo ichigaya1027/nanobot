@@ -99,13 +99,13 @@ async def test_start_suppresses_httpx_polling_logs(monkeypatch) -> None:
     ],
 )
 def test_channel_manager_preserves_weixin_quota_defaults(
+    tmp_path,
     section: dict[str, object],
     send_progress: bool,
     send_tool_hints: bool,
 ) -> None:
-    manager = ChannelManager.__new__(ChannelManager)
-    manager.config = Config.model_validate({"channels": {"weixin": section}})
-    manager.bus = MessageBus()
+    config = Config.model_validate({"channels": {"weixin": section}})
+    manager = ChannelManager(config, MessageBus(), config_path=tmp_path / "config.json")
 
     channel = manager._build_channel("weixin", WeixinChannel, section)
 

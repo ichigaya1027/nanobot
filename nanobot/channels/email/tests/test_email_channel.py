@@ -57,10 +57,9 @@ def _make_raw_email(
     return msg.as_bytes()
 
 
-def test_email_only_enables_final_reply_delivery() -> None:
-    manager = ChannelManager.__new__(ChannelManager)
-    manager.config = Config.model_validate({"channels": {"email": {"enabled": True}}})
-    manager.bus = MessageBus()
+def test_email_only_enables_final_reply_delivery(tmp_path) -> None:
+    config = Config.model_validate({"channels": {"email": {"enabled": True}}})
+    manager = ChannelManager(config, MessageBus(), config_path=tmp_path / "config.json")
 
     channel = manager._build_channel("email", EmailChannel, {"enabled": True})
 

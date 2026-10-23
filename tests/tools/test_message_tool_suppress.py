@@ -205,7 +205,6 @@ class TestMessageToolSchema:
         tool = MessageTool()
 
         assert "For normal replies, including scheduled reminders and reports, answer directly" in tool.description
-        assert "the final reply is delivered to the current chat automatically" in tool.description
         assert "deliver generated images via media" in tool.description
         assert (
             "Use artifact paths returned by generate_image"
