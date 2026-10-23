@@ -27,6 +27,7 @@ from nanobot.cli import terminal as cli_terminal
 from nanobot.cli import webui as cli_webui
 from nanobot.cli import webui_support as cli_webui_support
 from nanobot.cli.commands import app
+from nanobot.command import CommandRouter
 from nanobot.config.schema import Config
 from nanobot.cron.service import CronJobSkippedError
 from nanobot.cron.session_turns import CRON_DEFER_UNTIL_IDLE_META, CRON_TRIGGER_META
@@ -94,6 +95,7 @@ class _GatewayAgentContractStub:
     """Minimal stable AgentLoop surface required by gateway assembly tests."""
 
     tools = ToolRegistry()
+    commands = CommandRouter()
     subagents = MagicMock(spec=SubagentManager)
 
     @contextmanager
@@ -122,6 +124,14 @@ class _GatewayAgentContractStub:
         return None
 
     def preserve_inflight_turns_on_shutdown(self) -> None:
+        return None
+
+
+class _GatewayChannelContractStub:
+    """Gateway channels without a channel-specific turn policy."""
+
+    @staticmethod
+    def turn_policy(_message, _session_key, _tools):
         return None
 
 
@@ -2213,7 +2223,7 @@ def test_heartbeat_empty_response_is_not_evaluated(
         def stop(self) -> None:
             return None
 
-    class _FakeChannelManager:
+    class _FakeChannelManager(_GatewayChannelContractStub):
         def __init__(self, *_args, **_kwargs) -> None:
             self.enabled_channels = ["telegram"]
 
@@ -3664,7 +3674,7 @@ def test_gateway_local_trigger_queue_submits_agent_turns(
         def stop(self) -> None:
             return None
 
-    class _FakeChannelManager:
+    class _FakeChannelManager(_GatewayChannelContractStub):
         enabled_channels: list[str] = []
 
         def __init__(self, *_args, **_kwargs) -> None:
@@ -3933,7 +3943,7 @@ def test_gateway_health_endpoint_binds_and_serves_expected_responses(
         def stop(self) -> None:
             return None
 
-    class _FakeChannelManager:
+    class _FakeChannelManager(_GatewayChannelContractStub):
         def __init__(self, _config, _bus, **_kwargs) -> None:
             self.enabled_channels = ["telegram", "discord"]
 
@@ -4172,7 +4182,7 @@ def test_gateway_agent_task_owns_initial_mcp_provider_close(
         async def reload(self) -> dict[str, object]:
             return {"ok": True}
 
-    class _FakeChannelManager:
+    class _FakeChannelManager(_GatewayChannelContractStub):
         def __init__(self, _config, _bus, **_kwargs) -> None:
             self.enabled_channels = ["telegram"]
 
@@ -4294,7 +4304,7 @@ def test_gateway_shutdown_event_exits_forever_runtime_tasks(
         def stop(self) -> None:
             seen["agent_stopped"] = True
 
-    class _FakeChannelManager:
+    class _FakeChannelManager(_GatewayChannelContractStub):
         def __init__(self, _config, _bus, **_kwargs) -> None:
             self.enabled_channels = ["websocket"]
 
