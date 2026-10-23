@@ -40,6 +40,7 @@ This page is the complete configuration reference. For task-oriented setup, use 
 | Name and switch model choices | [Model Presets](#model-presets) |
 | Add fallback chains | [Model Fallbacks](#model-fallbacks) |
 | Configure voice transcription | [Transcription Settings](#transcription-settings) |
+| Enable QQ voice replies | [Speech Synthesis Settings](#speech-synthesis-settings) |
 | Tune channel defaults | [Channel Settings](#channel-settings) |
 | Configure local file search | [File Search](#file-search) |
 | Configure web search and fetch | [Web Tools](#web-tools) |
@@ -61,6 +62,7 @@ If the WebUI does not expose the option you need, start from the task below. Mos
 | Open the bundled WebUI | `channels.websocket.enabled`, optional `channels.websocket.port`, `channels.websocket.tokenIssueSecret` | `nanobot webui` | [Channel Settings](#channel-settings), [WebSocket docs](./websocket.md) |
 | Connect one chat app | `channels.<channel>.enabled`, channel credentials, optional pairing or `channels.<channel>.allowFrom` | `nanobot channels status`, then `nanobot gateway --verbose` | [Channel Settings](#channel-settings), [Chat Apps](./chat-apps.md) |
 | Enable voice transcription | `transcription.enabled`, `transcription.provider`, matching `providers.<name>.apiKey` | Send or upload a short voice message through a configured surface | [Transcription Settings](#transcription-settings) |
+| Enable QQ voice replies | `speechSynthesis`, `channels.napcat.groupAgent` | Ask for a voice reply in an authorized autonomous group | [Speech Synthesis Settings](#speech-synthesis-settings), [Chat Apps](./chat-apps.md) |
 | Enable web search or fetch | `tools.web.search.*`, `tools.web.fetch.*`, optional `tools.ssrfWhitelist` | Ask a question that requires current web information, then inspect logs if needed | [Web Tools](#web-tools), [Security](#security) |
 | Enable image generation | `tools.imageGeneration.enabled`, `tools.imageGeneration.provider`, `tools.imageGeneration.model`, matching provider credentials | Enable Image Generation in the WebUI and send one image request | [Image Generation](#image-generation) |
 | Add external tools through MCP | `tools.mcpServers.<name>` | Start `nanobot gateway --verbose` and check startup/tool logs | [MCP](#mcp-model-context-protocol) |
@@ -1644,6 +1646,34 @@ Transcription credentials are intentionally not stored in `transcription`. Put t
 Selecting a transcription provider does not configure credentials by itself. For example, the effective provider may default to Groq for compatibility, but transcription is only usable when `providers.groq.apiKey` or the matching environment-backed config is available. The Settings UI writes only the top-level `transcription` fields.
 
 If you are adding a new transcription provider, see [`development.md`](./development.md#adding-a-transcription-provider).
+
+## Speech Synthesis Settings
+
+NapCat autonomous groups can use `send_voice` to synthesize text with a configured Bailian custom voice and send one native QQ voice message. Configure the top-level `speechSynthesis` section in `config.json`, then restart the gateway. This setting is separate from incoming audio transcription and has no WebUI control.
+
+```json
+{
+  "speechSynthesis": {
+    "enabled": true,
+    "apiBase": "https://<WorkspaceId>.cn-beijing.maas.aliyuncs.com/api/v1",
+    "apiKey": "${DASHSCOPE_API_KEY}",
+    "model": "qwen-audio-3.1-tts-plus",
+    "voice": "your-existing-custom-voice-id"
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `enabled` | `false` | Makes `send_voice` available in authorized NapCat autonomous groups. |
+| `apiBase` | `""` | Bailian API base URL for the voice's region and workspace. The synthesis request appends `/services/audio/tts/SpeechSynthesizer`. |
+| `apiKey` | `""` | API key or environment reference, such as `${DASHSCOPE_API_KEY}`. |
+| `model` | `"qwen-audio-3.1-tts-plus"` | Synthesis model. It must match the target model used to create the custom voice. |
+| `voice` | `""` | An existing custom voice ID accessible to the configured API key and workspace. |
+
+All four connection and voice fields are required when enabled. Use the API base URL and credential for the workspace that owns the voice; creating a custom voice is a separate Bailian operation. See the [Bailian HTTP API documentation](https://help.aliyun.com/zh/model-studio/qwen-audio-tts-http-api) for endpoint details.
+
+The agent supplies the spoken `text`, an optional speaking-style `instruction`, and `end_response`. Nanobot downloads the complete 24 kHz WAV returned by Bailian and sends it to NapCat as a native recording; NapCat handles conversion and upload. A successful tool result includes the QQ `message_id`. Synthesis failures, send rejections, or uncertain send outcomes return to the agent for handling. The tool does not retry or replace failed speech with text automatically. As with other QQ action tools, `end_response=true` skips the next model call only after every tool call in the current response succeeds.
 
 ## Channel Settings
 

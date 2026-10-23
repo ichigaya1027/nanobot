@@ -20,6 +20,7 @@ from nanobot.agent.tools.web_config import (
     WebSearchConfig as WebSearchConfig,
 )
 from nanobot.agent.tools.web_config import WebToolsConfig
+from nanobot.audio.synthesis_config import SpeechSynthesisConfig
 from nanobot.config.home import get_default_workspace
 from nanobot.config.provider_api_migration import migrate_legacy_provider_api
 from nanobot.config.timezone import detect_system_timezone
@@ -504,6 +505,11 @@ class Config(BaseSettings):
     agents: AgentsConfig = Field(default_factory=AgentsConfig)
     channels: ChannelsConfig = Field(default_factory=ChannelsConfig)
     transcription: TranscriptionConfig = Field(default_factory=TranscriptionConfig)
+    speech_synthesis: SpeechSynthesisConfig = Field(
+        default_factory=SpeechSynthesisConfig,
+        validation_alias=AliasChoices("speechSynthesis", "speech_synthesis"),
+        serialization_alias="speechSynthesis",
+    )
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     api: ApiConfig = Field(default_factory=ApiConfig)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)

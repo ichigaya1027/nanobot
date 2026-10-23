@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -27,6 +28,7 @@ ActionCaller = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 ImageBuilder = Callable[[str], Awaitable[dict[str, Any] | None]]
 MessageEnricher = Callable[[GroupMessage], Awaitable[GroupMessage]]
 VoiceTranscriber = Callable[[GroupMessage], Awaitable[str]]
+VoiceSynthesizer = Callable[[str, str | None], Awaitable[bytes]]
 
 
 class ActionRejectedError(RuntimeError):
@@ -46,6 +48,7 @@ class GroupRun:
     observer: GroupObserver
     enrich: MessageEnricher | None = None
     transcribe: VoiceTranscriber | None = None
+    synthesize: VoiceSynthesizer | None = None
     messages: dict[str, GroupMessage] = field(default_factory=dict)
     users: set[str] = field(default_factory=set)
     outcomes: list[str] = field(default_factory=list)
@@ -155,6 +158,20 @@ class GroupRun:
             segments.append(image)
         if not text and not media:
             raise ValueError("A message requires content or media")
+        return await self._send_segments(segments)
+
+    async def send_voice(self, text: str, instruction: str | None) -> dict[str, Any]:
+        if self.synthesize is None:
+            raise ValueError("Speech synthesis is unavailable")
+        text = strip_think(text).strip()
+        if not text:
+            raise ValueError("A voice message requires text")
+        audio = await self.synthesize(text, instruction)
+        return await self._send_segments([{
+            "type": "record", "data": {"file": "base64://" + base64.b64encode(audio).decode()},
+        }])
+
+    async def _send_segments(self, segments: list[dict[str, Any]]) -> dict[str, Any]:
         with self.observer.sending(self.group_id):
             response = await self.call("send_msg", {
                 "message_type": "group", "group_id": self.group_id, "message": segments,
@@ -170,6 +187,7 @@ class GroupRun:
 
 _DESCRIPTIONS = {
     "send_message": "Send a message to the active QQ group, optionally with images and mentions.",
+    "send_voice": "Synthesize text with the configured voice and send one native voice message to the active QQ group. Optionally give a speaking-style instruction. A successful result confirms the QQ send receipt.",
     "reply_message": "Reply to an observed or retrieved message in the active QQ group.",
     "react_message": "Add an emoji reaction to an observed or retrieved group message.",
     "poke_user": "Poke a user observed in the active QQ group.",
@@ -211,6 +229,12 @@ class QQGroupTool(Tool):
                 "mentions": {"type": "array", "items": {"type": "string"}},
             })
             required.append("content")
+        if self.name == "send_voice":
+            fields.update({
+                "text": {"type": "string", "minLength": 1},
+                "instruction": {"type": "string", "description": "Optional speaking style, emotion or delivery instruction for synthesis."},
+            })
+            required.append("text")
         if self.name in {"reply_message", "react_message", "get_message", "get_voice_transcript"}:
             fields["message_id"] = {"type": "string"}
             required.append("message_id")
@@ -271,7 +295,9 @@ class QQGroupTool(Tool):
             return {"message_id": message.message_id, "transcript": await self.run.transcribe(message)}
         if self.name in {"get_chat_history", "search_chat_history"}:
             return await self._query(args)
-        if self.name in {"send_message", "reply_message"}:
+        if self.name == "send_voice":
+            result = await self.run.send_voice(args["text"], args.get("instruction"))
+        elif self.name in {"send_message", "reply_message"}:
             result = await self.run.send(
                 args["content"], args.get("media", []),
                 args.get("message_id", "") if self.name == "reply_message" else "",
@@ -382,8 +408,9 @@ def group_turn_policy(
     message: InboundMessage, group_id: str, channel: str, tools: ToolRegistry,
     call: ActionCaller, image: ImageBuilder, observer: GroupObserver,
     *, enrich: MessageEnricher | None = None, transcribe: VoiceTranscriber | None = None,
+    synthesize: VoiceSynthesizer | None = None,
 ) -> TurnPolicy:
-    run = GroupRun(channel, group_id, call, image, observer, enrich, transcribe)
+    run = GroupRun(channel, group_id, call, image, observer, enrich, transcribe, synthesize)
     run.observe(message)
     registry = ToolRegistry()
     for name in tools.tool_names:
@@ -391,6 +418,8 @@ def group_turn_policy(
         if tool is not None:
             registry.register(tool)
     for name in _DESCRIPTIONS:
+        if name == "send_voice" and synthesize is None:
+            continue
         registry.register(QQGroupTool(name, run))
     original = tools.get("message")
     if original is not None:

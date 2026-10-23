@@ -37,6 +37,7 @@ from nanobot.channels.napcat.group_agent import (
 from nanobot.channels.napcat.group_tools import (
     ActionOutcomeUnknownError,
     ActionRejectedError,
+    VoiceSynthesizer,
     group_turn_policy,
 )
 from nanobot.config.paths import get_media_dir
@@ -714,10 +715,23 @@ class NapcatChannel(BaseChannel):
             raise PermissionError(f"napcat: group {group_id} is not allowed")
         if not self.group_observer.enabled(group_id):
             return None
+        from nanobot.audio.synthesis import synthesize_speech
+        from nanobot.config.loader import load_config
+
+        speech = load_config().speech_synthesis
+        synthesize: VoiceSynthesizer | None = None
+        if speech.enabled:
+            async def synthesize_voice(text: str, instruction: str | None) -> bytes:
+                result = await synthesize_speech(text, speech, instruction=instruction)
+                logger.debug("Speech synthesized: request_id={}", result.request_id)
+                return result.audio
+
+            synthesize = synthesize_voice
         return group_turn_policy(
             message, group_id, self.name, tools, self._group_action,
             self._build_image_segment, self.group_observer,
             enrich=self._enrich_group_message, transcribe=self._transcribe_group_voice,
+            synthesize=synthesize,
         )
 
     async def _build_image_segment(self, ref: str) -> dict[str, Any] | None:
