@@ -11,6 +11,7 @@ import { SkillsCatalogSettings } from "@/components/settings/SkillsCatalogSettin
 import { ImageGenerationSettings } from "@/components/settings/capabilities/ImageGenerationSettings";
 import { AdvancedSettings } from "@/components/settings/capabilities/SecuritySettings";
 import { TranscriptionSettings } from "@/components/settings/capabilities/TranscriptionSettings";
+import { SpeechSynthesisSettings, speechSynthesisDraftState } from "@/components/settings/capabilities/SpeechSynthesisSettings";
 import { WebSettings } from "@/components/settings/capabilities/WebSettings";
 import {
   ModelPresetDeleteDialog,
@@ -128,6 +129,9 @@ export function SettingsPage({
     transcriptionDirty,
   } = controller;
   const { providerOAuthFlow } = modelState;
+  const speechDraft = settings ? speechSynthesisDraftState(settings, capabilityState.speechSynthesisForm) : null;
+  const speechError = capabilityState.capabilityErrors.speech || (speechDraft && !speechDraft.ready
+    ? t("settings.speechSynthesis.missingConfiguration") : undefined);
 
   const restartInProgress = isRestarting || hostEngineApplying;
   const requestExit = useCallback<SettingsExitGuard>((leave) => {
@@ -193,6 +197,22 @@ export function SettingsPage({
               onChange={(enabled) => capabilityState.setTranscriptionForm((prev) => ({ ...prev, enabled }))}>
               {renderSection("voice", true)}
             </SettingsFeature>
+            {controller.speechSynthesisSupported && settings.speech_synthesis ? (
+              <SettingsFeature title={t("settings.speechSynthesis.title")} enabled={capabilityState.speechSynthesisForm.enabled}
+                error={speechError}
+                disabled={restartInProgress || capabilityState.speechSynthesisSaving}
+                onChange={(enabled) => capabilityState.setSpeechSynthesisForm((prev) => ({ ...prev, enabled }))}>
+                <SpeechSynthesisSettings
+                  settings={settings}
+                  form={capabilityState.speechSynthesisForm}
+                  dirty={speechDraft?.dirty ?? false}
+                  saving={capabilityState.speechSynthesisSaving}
+                  error={speechError}
+                  onChangeForm={capabilityState.setSpeechSynthesisForm}
+                  onSave={capabilityActions.saveSpeechSynthesisSettings}
+                />
+              </SettingsFeature>
+            ) : null}
             <SettingsFeature title={t("settings.runtimeConfig.groups.web.title")}
               enabled={settings.runtime_config ? state.value("tools.web.enable") === true : settings.web.enable}
               disabled={restartInProgress || state.saving === "web" || !settings.runtime_config}

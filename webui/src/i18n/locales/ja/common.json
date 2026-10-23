@@ -809,6 +809,12 @@
       "opening": "開いています...",
       "exporting": "書き出しています..."
     },
+    "speechSynthesis": {
+      "title": "音声合成",
+      "voice": "音声 ID",
+      "help": "テキストを音声に変換し、QQ 自律応答グループで送信します。",
+      "missingConfiguration": "有効にする前に API URL、キー、モデル、音声を入力してください。"
+    },
     "byok": {
       "description": "モデルのプリセット用にプロバイダーの認証情報を追加します。",
       "configured": "設定済み",

@@ -1239,6 +1239,12 @@
       "opening": "Opening...",
       "exporting": "Exporting..."
     },
+    "speechSynthesis": {
+      "title": "Speech synthesis",
+      "voice": "Voice ID",
+      "help": "Synthesize text for voice replies in QQ autonomous groups.",
+      "missingConfiguration": "Fill in the API URL, key, model and voice before enabling."
+    },
     "byok": {
       "description": "Add provider credentials for model presets.",
       "configured": "Configured",

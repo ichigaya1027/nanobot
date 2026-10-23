@@ -27,6 +27,7 @@ UPDATE_SETTLE_HANDOFF_CAPABILITY = "webui.update-jobs.settle-handoff.v1"
 UPDATE_FLOW_CAPABILITY = "webui.update-flow.v1"
 UPDATE_CHANNEL_CAPABILITY = "webui.update-channels.v1"
 PROMPT_NAVIGATION_CAPABILITY = "webui.prompt-navigation.v1"
+SPEECH_SYNTHESIS_SETTINGS_CAPABILITY = "webui.speech-synthesis-settings.v1"
 
 
 class Compatibility(TypedDict):
@@ -47,6 +48,7 @@ def webui_contract() -> dict[str, object]:
             UPDATE_JOB_CAPABILITY, UPDATE_PREPARATION_CAPABILITY, UPDATE_EXECUTION_CAPABILITY,
             UPDATE_RETRY_CAPABILITY, UPDATE_SETTLE_HANDOFF_CAPABILITY, UPDATE_FLOW_CAPABILITY, UPDATE_CHANNEL_CAPABILITY,
             PROMPT_NAVIGATION_CAPABILITY,
+            SPEECH_SYNTHESIS_SETTINGS_CAPABILITY,
         ],
     }
 

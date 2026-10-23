@@ -8,8 +8,11 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, TypedDict
 
+from pydantic import ValidationError
+
 from nanobot.agent.tools.web import SEARCH_PROVIDER_OPTIONS
 from nanobot.api.runtime import ApiRuntime, ApiStartOptions
+from nanobot.audio.synthesis_config import SpeechSynthesisConfig
 from nanobot.audio.transcription import resolve_transcription_config
 from nanobot.audio.transcription_registry import (
     resolve_transcription_provider,
@@ -64,6 +67,7 @@ class CapabilitySettingsOperations:
     update_api: SettingsOperation
     update_image: SettingsOperation
     update_transcription: SettingsOperation
+    update_speech_synthesis: SettingsOperation
     update_network: SettingsOperation
     nanobot_features_action: SettingsOperation
     api_runtime: Callable[[], ApiRuntime]
@@ -77,6 +81,7 @@ class CapabilitySettingsPayload(TypedDict):
     observability: dict[str, Any]
     image_generation: dict[str, Any]
     transcription: dict[str, Any]
+    speech_synthesis: dict[str, Any]
 
 
 _WEB_SEARCH_PROVIDER_OPTIONS = SEARCH_PROVIDER_OPTIONS
@@ -236,6 +241,13 @@ def capability_settings_payload(
             "max_duration_sec": transcription.max_duration_sec,
             "max_upload_mb": transcription.max_upload_mb,
             "providers": _transcription_provider_rows(config),
+        },
+        "speech_synthesis": {
+            "enabled": config.speech_synthesis.enabled,
+            "api_base": config.speech_synthesis.api_base,
+            "api_key_configured": bool(config.speech_synthesis.api_key),
+            "model": config.speech_synthesis.model,
+            "voice": config.speech_synthesis.voice,
         },
     }
 
@@ -594,6 +606,29 @@ def update_transcription_settings(config: Config, query: QueryParams) -> bool:
     return changed
 
 
+def update_speech_synthesis_settings(config: Config, query: QueryParams) -> bool:
+    values = config.speech_synthesis.model_dump()
+    enabled = query_first(query, "enabled")
+    if enabled is not None:
+        values["enabled"] = parse_bool(enabled, "enabled")
+    for name in ("api_base", "model", "voice"):
+        value = query_first(query, name)
+        if value is not None:
+            values[name] = value.strip()
+    api_key = query_first(query, "api_key")
+    if api_key is not None and api_key.strip():
+        values["api_key"] = api_key.strip()
+    try:
+        candidate = SpeechSynthesisConfig.model_validate(values)
+    except ValidationError as exc:
+        raise WebUISettingsError(
+            "; ".join(error["msg"] for error in exc.errors(include_input=False))
+        ) from None
+    changed = candidate != config.speech_synthesis
+    config.speech_synthesis = candidate
+    return changed
+
+
 def network_safety_payload(config: Config) -> dict[str, Any]:
     """Return the network-related fields embedded in the advanced DTO."""
     return {
@@ -684,6 +719,11 @@ class CapabilitySettingsHandler:
             ),
             "transcription-update": (
                 operations.update_transcription,
+                None,
+                False,
+            ),
+            "speech-synthesis-update": (
+                operations.update_speech_synthesis,
                 None,
                 False,
             ),

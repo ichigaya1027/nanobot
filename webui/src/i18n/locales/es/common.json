@@ -809,6 +809,12 @@
       "opening": "Abriendo...",
       "exporting": "Exportando..."
     },
+    "speechSynthesis": {
+      "title": "Síntesis de voz",
+      "voice": "ID de voz",
+      "help": "Sintetiza texto para respuestas de voz en grupos autónomos de QQ.",
+      "missingConfiguration": "Completa la URL de la API, la clave, el modelo y la voz antes de activar."
+    },
     "byok": {
       "description": "Añade credenciales del proveedor para los preajustes.",
       "configured": "Configurado",

@@ -1239,6 +1239,12 @@
       "opening": "正在打开...",
       "exporting": "正在导出..."
     },
+    "speechSynthesis": {
+      "title": "语音合成",
+      "voice": "音色 ID",
+      "help": "将文字合成为语音，供 QQ 自主群发送。",
+      "missingConfiguration": "启用前请填写 API 地址、密钥、模型和音色。"
+    },
     "byok": {
       "description": "配置提供商密钥，供模型预设使用",
       "configured": "已配置",

@@ -809,6 +809,12 @@
       "opening": "Membuka...",
       "exporting": "Mengekspor..."
     },
+    "speechSynthesis": {
+      "title": "Sintesis suara",
+      "voice": "ID suara",
+      "help": "Ubah teks menjadi suara untuk balasan di grup QQ otonom.",
+      "missingConfiguration": "Isi URL API, kunci, model, dan suara sebelum mengaktifkan."
+    },
     "byok": {
       "description": "Tambahkan kredensial penyedia untuk preset model.",
       "configured": "Terkonfigurasi",

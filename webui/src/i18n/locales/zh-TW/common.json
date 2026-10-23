@@ -809,6 +809,12 @@
       "opening": "正在開啟…",
       "exporting": "正在匯出…"
     },
+    "speechSynthesis": {
+      "title": "語音合成",
+      "voice": "音色 ID",
+      "help": "將文字合成為語音，供 QQ 自主群傳送。",
+      "missingConfiguration": "啟用前請填寫 API 位址、金鑰、模型和音色。"
+    },
     "byok": {
       "description": "配置提供商金鑰，供模型預設使用",
       "configured": "已設定",

@@ -55,6 +55,7 @@ from nanobot.webui.settings_api import (
     update_network_safety_settings,
     update_provider_settings,
     update_runtime_config_settings,
+    update_speech_synthesis_settings,
     update_transcription_settings,
     update_web_search_settings,
 )
@@ -126,6 +127,7 @@ _CAPABILITY_ROUTES = {
     "/api/settings/api-service/stop": "api-stop",
     "/api/settings/image-generation/update": "image-update",
     "/api/settings/transcription/update": "transcription-update",
+    "/api/settings/speech-synthesis/update": "speech-synthesis-update",
     "/api/settings/network-safety/update": "network-update",
 }
 
@@ -184,6 +186,7 @@ _SETTINGS_MUTATION_PATHS = frozenset({
     "/api/settings/api-service/stop",
     "/api/settings/image-generation/update",
     "/api/settings/transcription/update",
+    "/api/settings/speech-synthesis/update",
     "/api/settings/network-safety/update",
     "/api/settings/cli-apps/install",
     "/api/settings/cli-apps/update",
@@ -534,6 +537,7 @@ class WebUISettingsRouter:
             update_api=update_api_settings,
             update_image=update_image_generation_settings,
             update_transcription=update_transcription_settings,
+            update_speech_synthesis=update_speech_synthesis_settings,
             update_network=update_network_safety_settings,
             nanobot_features_action=nanobot_features_action,
             api_runtime=self._api_runtime,

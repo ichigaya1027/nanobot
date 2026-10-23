@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { imageGenerationFormFromPayload } from "@/components/settings/capabilities/ImageGenerationSettings";
+import { speechSynthesisDraftState, speechSynthesisFormFromPayload } from "@/components/settings/capabilities/SpeechSynthesisSettings";
 import {
   networkSafetyFormFromPayload,
   visibleWebuiDefaultAccessMode,
@@ -81,7 +82,8 @@ export function useSettingsController({
   onNativeEngineRestart,
 }: SettingsControllerOptions) {
   const { t } = useTranslation();
-  const { client, getToken, token } = useClient();
+  const { client, getToken, token, webuiCapabilities } = useClient();
+  const speechSynthesisSupported = webuiCapabilities.includes("webui.speech-synthesis-settings.v1");
   const pageVisible = usePageVisibility();
   const remoteBrowserAccess =
     typeof window !== "undefined" && !isLoopbackHost(window.location.hostname);
@@ -144,6 +146,7 @@ export function useSettingsController({
         setWebSearchForm((prev) => webSearchFormFromPayload(payload, prev));
         setImageGenerationForm(imageGenerationFormFromPayload(payload));
         setTranscriptionForm(transcriptionFormFromPayload(payload));
+        capabilityState.setSpeechSynthesisForm(speechSynthesisFormFromPayload(payload));
         setNetworkSafetyForm(networkSafetyFormFromPayload(payload));
       }
       if (payload.restart_required_sections) {
@@ -441,6 +444,7 @@ export function useSettingsController({
     installCapabilities,
     imageGenerationDirty,
     transcriptionDirty,
+    speechSynthesisDirty: settings ? speechSynthesisDraftState(settings, capabilityState.speechSynthesisForm).dirty : false,
     networkSafetyDirty,
   });
   useAutoSave(imageGenerationForm, imageGenerationDirty, imageGenerationSaving, capabilityActions.saveImageGenerationSettings,
@@ -448,12 +452,16 @@ export function useSettingsController({
       (provider) => provider.name === imageGenerationForm.provider,
     )?.configured));
   useAutoSave(transcriptionForm, transcriptionDirty, transcriptionSaving, capabilityActions.saveTranscriptionSettings);
+  const speechDraft = settings ? speechSynthesisDraftState(settings, capabilityState.speechSynthesisForm) : null;
+  useAutoSave(capabilityState.speechSynthesisForm, speechDraft?.dirty ?? false, capabilityState.speechSynthesisSaving,
+    capabilityActions.saveSpeechSynthesisSettings, speechSynthesisSupported && (speechDraft?.ready ?? false));
   const webDraft = settings ? webSearchDraftState(settings, webSearchForm) : null;
   useAutoSave(webSearchForm, webDraft?.dirty ?? false, webSearchSaving, capabilityActions.saveWebSearch,
     !webDraft?.missingCredential && (webSearchForm.provider !== "olostep" ||
       featureCatalog.some((feature) => feature.name === "olostep" && feature.installed)));
 
   return {
+    speechSynthesisSupported,
     modelState,
     modelActions,
     capabilityState,

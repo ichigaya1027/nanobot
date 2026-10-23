@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_SPEECH_SYNTHESIS_FORM, speechSynthesisFormFromPayload } from "@/components/settings/capabilities/SpeechSynthesisSettings";
 
 import {
   DEFAULT_IMAGE_GENERATION_FORM,
@@ -21,11 +22,16 @@ import type {
   NetworkSafetySettingsUpdate,
   SettingsPayload,
   TranscriptionSettingsUpdate,
+  SpeechSynthesisSettingsUpdate,
   WebSearchSettingsUpdate,
 } from "@/lib/types";
 
 export function useCapabilitySettingsState(initialSettings: SettingsPayload | null) {
-  const [capabilityErrors, setCapabilityErrors] = useState<Partial<Record<"image" | "voice" | "web" | "safety", string>>>({});
+  const [capabilityErrors, setCapabilityErrors] = useState<Partial<Record<"image" | "voice" | "speech" | "web" | "safety", string>>>({});
+  const [speechSynthesisSaving, setSpeechSynthesisSaving] = useState(false);
+  const [speechSynthesisForm, setSpeechSynthesisForm] = useState<SpeechSynthesisSettingsUpdate>(
+    () => initialSettings ? speechSynthesisFormFromPayload(initialSettings) : DEFAULT_SPEECH_SYNTHESIS_FORM,
+  );
   const [webSearchSaving, setWebSearchSaving] = useState(false);
   const [imageGenerationSaving, setImageGenerationSaving] = useState(false);
   const [transcriptionSaving, setTranscriptionSaving] = useState(false);
@@ -48,6 +54,10 @@ export function useCapabilitySettingsState(initialSettings: SettingsPayload | nu
   const [webSearchKeyEditing, setWebSearchKeyEditing] = useState(false);
 
   return {
+    speechSynthesisForm,
+    speechSynthesisSaving,
+    setSpeechSynthesisForm,
+    setSpeechSynthesisSaving,
     capabilityErrors,
     setCapabilityErrors,
     imageGenerationForm,

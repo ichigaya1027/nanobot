@@ -15,12 +15,14 @@ import {
   updateImageGenerationSettings,
   updateNetworkSafetySettings,
   updateTranscriptionSettings,
+  updateSpeechSynthesisSettings,
   updateWebSearchSettings,
 } from "@/lib/api";
 import type { NanobotClient } from "@/lib/nanobot-client";
 import type { ImageGenerationSettingsUpdate, SettingsPayload, WebSearchSettingsUpdate } from "@/lib/types";
 import { imageGenerationFormFromPayload } from "@/components/settings/capabilities/ImageGenerationSettings";
 import { transcriptionFormFromPayload } from "@/components/settings/capabilities/TranscriptionSettings";
+import { speechSynthesisDraftState, speechSynthesisFormFromPayload } from "@/components/settings/capabilities/SpeechSynthesisSettings";
 import { networkSafetyFormFromPayload } from "@/components/settings/capabilities/SecuritySettings";
 
 interface CapabilitySettingsActionsOptions {
@@ -34,6 +36,7 @@ interface CapabilitySettingsActionsOptions {
   installCapabilities: (names: string[]) => Promise<boolean>;
   imageGenerationDirty: boolean;
   transcriptionDirty: boolean;
+  speechSynthesisDirty: boolean;
   networkSafetyDirty: boolean;
 }
 
@@ -48,6 +51,7 @@ export function useCapabilitySettingsActions({
   installCapabilities,
   imageGenerationDirty,
   transcriptionDirty,
+  speechSynthesisDirty,
   networkSafetyDirty,
 }: CapabilitySettingsActionsOptions) {
   const {
@@ -68,7 +72,7 @@ export function useCapabilitySettingsActions({
     webSearchKeyEditing,
     webSearchSaving,
   } = state;
-  const setError = (section: "image" | "voice" | "web" | "safety", message?: string) =>
+  const setError = (section: "image" | "voice" | "speech" | "web" | "safety", message?: string) =>
     state.setCapabilityErrors((prev) => ({ ...prev, [section]: message }));
 
   const persistImageSettings = async (values: ImageGenerationSettingsUpdate) => {
@@ -122,6 +126,22 @@ export function useCapabilitySettingsActions({
       setError("voice", (err as Error).message);
     } finally {
       setTranscriptionSaving(false);
+    }
+  };
+
+  const saveSpeechSynthesisSettings = async () => {
+    if (!settings || !speechSynthesisDirty || state.speechSynthesisSaving
+      || !speechSynthesisDraftState(settings, state.speechSynthesisForm).ready) return;
+    setError("speech");
+    state.setSpeechSynthesisSaving(true);
+    try {
+      const payload = await updateSpeechSynthesisSettings(client, state.speechSynthesisForm);
+      applyPayload(payload, { preserveCapabilityForms: true });
+      state.setSpeechSynthesisForm(speechSynthesisFormFromPayload(payload));
+    } catch (err) {
+      setError("speech", (err as Error).message);
+    } finally {
+      state.setSpeechSynthesisSaving(false);
     }
   };
 
@@ -232,6 +252,7 @@ export function useCapabilitySettingsActions({
     saveImageRequestSettings,
     saveNetworkSafetySettings,
     saveTranscriptionSettings,
+    saveSpeechSynthesisSettings,
     saveWebSearch,
   };
 }

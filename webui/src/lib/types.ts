@@ -842,6 +842,13 @@ export interface SettingsPayload {
       default_api_base?: string | null;
     }>;
   };
+  speech_synthesis?: {
+    enabled: boolean;
+    api_base: string;
+    api_key_configured: boolean;
+    model: string;
+    voice: string;
+  };
   runtime: {
     config_path: string;
     workspace_path: string;
@@ -1428,6 +1435,14 @@ export interface TranscriptionSettingsUpdate {
   language: string;
   maxDurationSec: number;
   maxUploadMb: number;
+}
+
+export interface SpeechSynthesisSettingsUpdate {
+  enabled: boolean;
+  apiBase: string;
+  apiKey: string;
+  model: string;
+  voice: string;
 }
 
 /**

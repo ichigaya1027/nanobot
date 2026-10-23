@@ -809,6 +809,12 @@
       "opening": "여는 중...",
       "exporting": "내보내는 중..."
     },
+    "speechSynthesis": {
+      "title": "음성 합성",
+      "voice": "음성 ID",
+      "help": "텍스트를 음성으로 합성하여 QQ 자율 응답 그룹에서 전송합니다.",
+      "missingConfiguration": "활성화하기 전에 API URL, 키, 모델, 음성을 입력하세요."
+    },
     "byok": {
       "description": "모델 프리셋에 사용할 제공업체 인증 정보를 추가하세요.",
       "configured": "설정됨",

@@ -809,6 +809,12 @@
       "opening": "Đang mở...",
       "exporting": "Đang xuất..."
     },
+    "speechSynthesis": {
+      "title": "Tổng hợp giọng nói",
+      "voice": "ID giọng nói",
+      "help": "Chuyển văn bản thành giọng nói để trả lời trong các nhóm QQ tự chủ.",
+      "missingConfiguration": "Nhập URL API, khóa, mô hình và giọng nói trước khi bật."
+    },
     "byok": {
       "description": "Thêm thông tin xác thực nhà cung cấp cho bộ thiết lập mô hình.",
       "configured": "Đã cấu hình",

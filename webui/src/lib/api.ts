@@ -45,6 +45,7 @@ import type {
   SubagentTaskSnapshot,
   SubagentTasksPayload,
   TranscriptionSettingsUpdate,
+  SpeechSynthesisSettingsUpdate,
   ThreadProjectionEvent,
   WebSearchSettingsUpdate,
   WorkspacesPayload,
@@ -1507,6 +1508,23 @@ export async function updateTranscriptionSettings(
   );
 }
 
+
+export async function updateSpeechSynthesisSettings(
+  transport: WebUIMutationTransport,
+  update: SpeechSynthesisSettingsUpdate,
+): Promise<SettingsPayload> {
+  return mutation<SettingsPayload>(
+    transport,
+    "settings.speech_synthesis.update",
+    {
+      enabled: update.enabled,
+      api_base: update.apiBase,
+      ...(update.apiKey.trim() ? { api_key: update.apiKey } : {}),
+      model: update.model,
+      voice: update.voice,
+    },
+  );
+}
 
 export async function updateRuntimeConfigSettings(
   transport: WebUIMutationTransport,

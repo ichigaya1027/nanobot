@@ -1053,6 +1053,12 @@
       "opening": "Abrindo...",
       "exporting": "Exportando..."
     },
+    "speechSynthesis": {
+      "title": "Síntese de voz",
+      "voice": "ID da voz",
+      "help": "Sintetize texto para respostas de voz em grupos autônomos do QQ.",
+      "missingConfiguration": "Preencha a URL da API, a chave, o modelo e a voz antes de ativar."
+    },
     "byok": {
       "description": "Adicione credenciais do provedor para presets de modelos.",
       "configured": "Configurado",

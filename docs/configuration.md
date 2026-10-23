@@ -1649,7 +1649,7 @@ If you are adding a new transcription provider, see [`development.md`](./develop
 
 ## Speech Synthesis Settings
 
-NapCat autonomous groups can use `send_voice` to synthesize text with a configured Bailian custom voice and send one native QQ voice message. Configure the top-level `speechSynthesis` section in `config.json`, then restart the gateway. This setting is separate from incoming audio transcription and has no WebUI control.
+NapCat autonomous groups can use `send_voice` to synthesize text with a configured Bailian custom voice and send one native QQ voice message. Open **Settings → Capabilities → Speech synthesis** to enable it and edit the API URL, API key, model and voice ID. Settings apply from the next group turn without restarting. Leave the API key blank to keep the existing key or environment reference; saved keys are not returned to the browser. This setting is separate from incoming audio transcription. You can also configure the top-level `speechSynthesis` section in `config.json`:
 
 ```json
 {
