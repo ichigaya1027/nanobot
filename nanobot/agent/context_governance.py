@@ -131,6 +131,7 @@ class ContextGovernanceConfig:
     max_tool_result_chars: int
     context_window_tokens: int | None = None
     max_tokens: int | None = None
+    prepare_messages: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None
 
 
 @dataclass(slots=True)
@@ -340,6 +341,9 @@ class ContextGovernor:
                 and not is_hidden_history_message(prepared[-1])
                 and allows_conversation_message_merge(injection)
                 and allows_conversation_message_merge(prepared[-1])
+                # Channel annotations belong to the individual input boundary.
+                and not injection.get("context_metadata")
+                and not prepared[-1].get("context_metadata")
             ):
                 merged = dict(prepared[-1])
                 left_meta = merged.get("_meta")
@@ -415,6 +419,8 @@ class ContextGovernor:
     ) -> list[dict[str, Any]]:
         """Build the normalized model-facing copy of a raw transcript."""
         governed = self.prepare_for_model(config, messages)
+        if config.prepare_messages is not None:
+            governed = config.prepare_messages(governed)
         return self._merge_adjacent_user_messages_for_model(governed)
 
     def prepare_for_model(

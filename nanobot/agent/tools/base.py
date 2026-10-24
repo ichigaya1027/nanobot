@@ -201,11 +201,14 @@ class ToolResult(str):
 
     is_error: bool
     end_response: bool
+    # Persisted beside the result, never embedded in its model-facing content.
+    context_metadata: dict[str, Any] | None
 
     def __new__(cls, content: str, *, is_error: bool = False, end_response: bool = False) -> ToolResult:
         obj = str.__new__(cls, content)
         obj.is_error = is_error
         obj.end_response = end_response
+        obj.context_metadata = None
         return obj
 
     @classmethod

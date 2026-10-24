@@ -545,6 +545,7 @@ class NapcatChannel(BaseChannel):
 
     async def _observe_group(self, event: dict[str, Any]) -> None:
         received_at = time.monotonic()
+        received_at_ns = time.time_ns()
         if self.group_observer.seen(str(event.get("group_id", "")), str(event.get("message_id", ""))):
             return
         own = event.get("post_type") == "message_sent" or str(event.get("user_id")) == str(self._self_id)
@@ -567,7 +568,7 @@ class NapcatChannel(BaseChannel):
             except (RuntimeError, TimeoutError, OSError) as error:
                 logger.debug("Could not identify reply target: {}", error)
         raw = {**event, "message": segments}
-        message = GroupMessage.parse(raw)
+        message = replace(GroupMessage.parse(raw), received_at_ns=received_at_ns)
         self.group_observer.channel = self.name
         # Commands remain owned by the gateway command dispatcher.
         if not own and self.command_predicate is not None and self.command_predicate(text):

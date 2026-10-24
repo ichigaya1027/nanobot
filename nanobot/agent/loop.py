@@ -705,6 +705,8 @@ class AgentLoop:
     def _input_history_extra(msg: InboundMessage) -> dict[str, Any]:
         """Keep input admission separate from the run that eventually consumes it."""
         extra: dict[str, Any] = {"timestamp": msg.timestamp.isoformat()}
+        if "context_metadata" in msg.metadata:
+            extra["context_metadata"] = msg.metadata["context_metadata"]
         turn_id = msg.metadata.get(INBOUND_META_TURN_ID)
         if isinstance(turn_id, str) and turn_id:
             extra[INBOUND_META_TURN_ID] = turn_id
@@ -761,6 +763,7 @@ class AgentLoop:
             media=ctx.msg.media if ctx.kind is TurnKind.USER and ctx.msg.media else None,
             session_summary=ctx.pending_summary,
             runtime_context_blocks=ctx.runtime_context_blocks,
+            context_metadata=ctx.msg.metadata.get("context_metadata"),
         )
 
     async def _request_context_for_turn(self, ctx: TurnContext) -> RequestContext:
@@ -1124,6 +1127,8 @@ class AgentLoop:
                     "role": "user", "content": user_content,
                     "_meta": self._input_history_extra(pending_msg),
                 }
+                if "context_metadata" in pending_msg.metadata:
+                    row["context_metadata"] = pending_msg.metadata["context_metadata"]
                 if HIDDEN_HISTORY_META in pending_msg.metadata:
                     row[HIDDEN_HISTORY_META] = pending_msg.metadata[HIDDEN_HISTORY_META]
                 metadata_value = cast(object, pending_msg.metadata)
@@ -1333,6 +1338,7 @@ class AgentLoop:
                 hook=hook,
                 concurrent_tools=True,
                 accept_empty_final=tool_only_output,
+                prepare_messages=request_ctx.turn_policy.prepare_messages if request_ctx.turn_policy else None,
                 # Temporary turns use the governor's bounded in-memory results;
                 # never create durable spill files, even before discard/cancellation.
                 workspace=None if ephemeral else effective_scope.project_path,
@@ -2607,6 +2613,8 @@ class AgentLoop:
                 if isinstance(runtime_context_meta, dict):
                     entry[RUNTIME_CONTEXT_HISTORY_META] = runtime_context_meta
                 if isinstance(internal_meta, dict):
+                    if "context_metadata" in internal_meta:
+                        entry["context_metadata"] = internal_meta["context_metadata"]
                     for key in ("timestamp", INBOUND_META_TURN_ID):
                         value = cast(dict[str, Any], internal_meta).get(key)
                         if isinstance(value, str) and value:

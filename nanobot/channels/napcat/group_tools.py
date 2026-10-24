@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +20,7 @@ from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.turn_policy import TurnPolicy
 from nanobot.bus.events import InboundMessage
 from nanobot.channels.napcat.group_agent import OBSERVATION_KEY, GroupMessage, GroupObserver
+from nanobot.channels.napcat.group_context import prepare_group_context
 from nanobot.channels.napcat.group_rendering import render_group_messages
 from nanobot.security.workspace_access import current_tool_workspace
 from nanobot.utils.helpers import strip_think
@@ -275,15 +277,21 @@ class QQGroupTool(Tool):
                 status = "unknown" if uncertain else "failed"
             else:
                 status = "query_failed"
-            return ToolResult.error(json.dumps({
+            output = ToolResult.error(json.dumps({
                 "status": status, "error": str(error),
                 "note": "An unknown delivery may already have reached QQ; do not blindly resend." if status == "unknown" else "",
             }, ensure_ascii=False))
-        return ToolResult(
-            json.dumps(result, ensure_ascii=False),
-            is_error=bool(result.get("source_error")),
-            end_response=bool(kwargs.get("end_response")) or self.name == "stay_silent",
-        )
+        else:
+            output = ToolResult(
+                json.dumps(result, ensure_ascii=False),
+                is_error=bool(result.get("source_error")),
+                end_response=bool(kwargs.get("end_response")) or self.name == "stay_silent",
+            )
+        if not self.read_only:
+            output.context_metadata = {"napcat_action": {
+                "group_id": self.run.group_id, "completed_at_ns": time.time_ns(),
+            }}
+        return output
 
     async def _execute(self, args: dict[str, Any]) -> dict[str, Any]:
         if self.name == "get_message":
@@ -426,4 +434,5 @@ def group_turn_policy(
         registry.register(GroupMessageAlias(original, QQGroupTool("send_message", run)))
     return TurnPolicy(
         registry, render_template("agent/qq_group_policy.md"), True, run.observe, run.complete,
+        prepare_messages=prepare_group_context,
     )
