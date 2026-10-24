@@ -3,6 +3,8 @@ FROM node:24-bookworm-slim AS webui-builder
 WORKDIR /app
 COPY webui/package.json webui/package-lock.json ./webui/
 WORKDIR /app/webui
+# 设置npm为淘宝源，海外服务器可注释
+RUN npm config set registry https://registry.npmmirror.com/
 RUN npm ci
 COPY webui/ ./
 COPY packages/client-events/ /app/packages/client-events/
@@ -16,6 +18,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# uv和pip设置国内源，海外服务器可注释
+ENV PIP_INDEX_URL="https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+ENV UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple" 
 
 # Keep the runtime environment writable by the non-root nanobot user. Enabled
 # channels may install their manifest-declared dependencies at startup.

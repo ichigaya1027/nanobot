@@ -300,6 +300,12 @@ class NapcatChannel(BaseChannel):
 
         segments = self._normalize_segments(ev.get("message"))
         text, images, mentioned_self, reply_to_id = self._parse_segments(segments)
+        # ----------------- 自定义前缀拦截逻辑 -----------------
+        # 只要消息文本是以 #, *, % 开头的，直接当场拦截，不回发任何空消息或气泡
+        if text and text.strip().startswith(('#', '*', '%')):
+            return
+        # -----------------------------------------------------
+
 
         media_paths: list[str] = []
         for info in images:
