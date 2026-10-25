@@ -112,7 +112,7 @@ from nanobot.session.summary import (
 from nanobot.triggers.local_turns import LocalTriggerTurnCoordinator
 from nanobot.utils.cancellation import task_is_cancelling
 from nanobot.utils.document import reference_non_image_attachments
-from nanobot.utils.helpers import image_placeholder_text
+from nanobot.utils.helpers import image_path_in_text, image_placeholder_text
 from nanobot.utils.llm_runtime import LLMRuntime
 from nanobot.utils.progress_events import output_events
 from nanobot.utils.runtime import (
@@ -2466,6 +2466,8 @@ class AgentLoop:
         content: list[object],
     ) -> list[object]:
         """Strip volatile multimodal payloads before writing session history."""
+        text_blocks = [cast(dict[str, Any], block) for block in content if isinstance(block, dict)]
+        text = "\n".join(block["text"] for block in text_blocks if block.get("type") == "text")
         filtered: list[object] = []
         for block in content:
             if not isinstance(block, dict):
@@ -2482,9 +2484,10 @@ class AgentLoop:
                     filtered.append(block_data)
                     continue
                 path = cast(str, internal_meta.get("path", ""))
-                filtered.append(
-                    {"type": "text", "text": image_placeholder_text(path)}
-                )
+                if not image_path_in_text(path, text):
+                    filtered.append(
+                        {"type": "text", "text": image_placeholder_text(path)}
+                    )
                 continue
 
             filtered.append(block_data)

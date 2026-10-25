@@ -731,7 +731,7 @@ class NapcatChannel(BaseChannel):
         return group_turn_policy(
             message, group_id, self.name, tools, self._group_action,
             self._build_image_segment, self.group_observer,
-            enrich=self._enrich_group_message, transcribe=self._transcribe_group_voice,
+            enrich=self._prepare_group_message, transcribe=self._transcribe_group_voice,
             synthesize=synthesize,
         )
 

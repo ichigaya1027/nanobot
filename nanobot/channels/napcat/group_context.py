@@ -9,7 +9,11 @@ from typing import Any, cast
 from nanobot.channels.napcat.group_agent import GroupMessage
 from nanobot.channels.napcat.group_rendering import render_group_messages
 from nanobot.runtime_context import RUNTIME_CONTEXT_MESSAGE_META
-from nanobot.utils.helpers import image_placeholder_text
+from nanobot.utils.helpers import (
+    content_with_media_breadcrumbs,
+    image_path_in_text,
+    image_placeholder_text,
+)
 
 
 def _fragment(
@@ -26,17 +30,13 @@ def _fragment(
     fragment = dict(source)
     fragment["context_metadata"] = {"napcat_observation": records}
     if isinstance(content, str):
-        if not content.startswith(original_text):
-            raise ValueError("Group observation text does not match its records")
         suffix = content[len(original_text):]
         breadcrumbs = "\n" + "\n".join(image_placeholder_text(path) for path in all_paths)
-        media_suffix = ""
         if all_paths and suffix.endswith(breadcrumbs):
             suffix = suffix[:-len(breadcrumbs)]
-            media_suffix = "".join(
-                "\n" + image_placeholder_text(path) for path in all_paths if path in paths
-            )
-        fragment["content"] = text + (suffix if last else "") + media_suffix
+        fragment["content"] = content_with_media_breadcrumbs(
+            "user", text + (suffix if last else ""), [path for path in all_paths if path in paths],
+        )
     else:
         blocks: list[dict[str, Any]] = []
         for block in cast(list[dict[str, Any]], content):
@@ -47,7 +47,9 @@ def _fragment(
                 suffix = block["text"][len(original_text):] if last else ""
                 blocks.append({**block, "text": text + suffix})
             elif block.get("text") in {image_placeholder_text(path) for path in all_paths}:
-                if block["text"] in {image_placeholder_text(path) for path in paths}:
+                if block["text"] in {
+                    image_placeholder_text(path) for path in paths if not image_path_in_text(path, text)
+                }:
                     blocks.append(block)
             elif last:
                 blocks.append(block)
@@ -91,7 +93,14 @@ def prepare_group_context(messages: list[dict[str, Any]]) -> list[dict[str, Any]
         if all(target == index for target in destinations):
             kept[index].append(message)
             continue
-        original_text = render_group_messages([GroupMessage.parse(record) for record in records])
+        content = message["content"]
+        source_text = content if isinstance(content, str) else next(
+            block["text"] for block in content
+            if block.get("type") == "text" and block["text"].startswith("QQ group ")
+        )
+        # The stored header and one line per record delimit the observation.
+        # Re-rendering old records would couple replay to today's text format.
+        original_text = "\n".join(source_text.split("\n", len(records) + 1)[:len(records) + 1])
         for target, group in groupby(zip(destinations, records), key=lambda item: item[0]):
             part = [record for _, record in group]
             destination = kept[index] if target == index else before[target]

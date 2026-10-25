@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -611,7 +612,8 @@ def test_save_turn_keeps_image_placeholder_and_runtime_context() -> None:
     ]
 
 
-def test_native_image_ingress_retains_small_preview_and_retires_large_original(tmp_path) -> None:
+@pytest.mark.parametrize("inline_reference", [False, True])
+def test_native_image_ingress_retains_small_preview_and_retires_large_original(tmp_path, inline_reference) -> None:
     from random import Random
 
     from PIL import Image
@@ -621,15 +623,20 @@ def test_native_image_ingress_retains_small_preview_and_retires_large_original(t
     Image.new("RGB", (16, 16), "white").save(small)
     Image.frombytes("RGB", (256, 256), Random(0).randbytes(256 * 256 * 3)).save(large)
     builder = ContextBuilder(tmp_path)
-    current = builder.build_current_message("inspect", media=[str(small), str(large)])
+    text = f"inspect [image: {large}]" if inline_reference else "inspect"
+    current = builder.build_current_message(text, media=[str(small), str(large)])
     images = [part for part in current["content"] if part["type"] == "image_url"]
     assert len(images) == 2
+    assert [base64.b64decode(part["image_url"]["url"].split(",", 1)[1]) for part in images] == [
+        small.read_bytes(), large.read_bytes(),
+    ]
     loop = _mk_loop()
     session = Session(key="test:preview-history")
     loop._save_turn(session, [current], skip=0)
     replay = session.get_history()[0]["content"]
     assert [part["image_url"]["url"] for part in replay if part["type"] == "image_url"] == [images[0]["image_url"]["url"]]
-    assert any(part.get("text") == f"[image: {large}]" for part in replay)
+    replay_text = "\n".join(part["text"] for part in replay if part["type"] == "text")
+    assert replay_text.count(f"[image: {large}]") == 1
 
 
 def test_save_turn_keeps_image_placeholder_without_meta() -> None:

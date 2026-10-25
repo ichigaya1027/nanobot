@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 from zoneinfo import ZoneInfo
 
+from nanobot.utils.helpers import image_placeholder_text
+
 if TYPE_CHECKING:
     from nanobot.channels.napcat.group_agent import GroupMessage
 
@@ -53,10 +55,9 @@ def _segment(segment: dict[str, Any]) -> str:
     if kind == "face":
         return f"[face {_inline(data.get('id', ''))}]"
     if kind == "image":
-        source = data.get("url") or data.get("file") or ""
+        source = data.get("local_path") or data.get("url") or data.get("file")
         summary = f" {_inline(data['summary'])}" if data.get("summary") else ""
-        original = f" original={_inline(data['local_path'])}" if data.get("local_path") else ""
-        return f"[image {_inline(source)}{summary}{original}]"
+        return image_placeholder_text(_inline(source) if source else None) + summary
     if kind == "record":
         return "[voice]"
     # Retain other OneBot component payloads rather than replacing them with
