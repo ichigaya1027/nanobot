@@ -45,7 +45,7 @@ def _segment(segment: dict[str, Any]) -> str:
         return f"@{_inline(data.get('qq', ''))}{name}"
     if kind == "poke":
         target = "you" if data.get("target_is_self") else f"@{_inline(data.get('qq', ''))}"
-        text = f" {_inline(data['text'])}" if data.get("text") else ""
+        text = f" [QQ display text: {_compact(str(data['text']))}]" if data.get("text") else ""
         return f"[poke {target}]{text}"
     if kind == "face":
         return f"[face {_inline(data.get('id', ''))}]"
