@@ -268,6 +268,7 @@ class ContextBuilder:
         workspace: Path | None = None,
         include_memory: bool = True,
         instructions: str = "",
+        system_prompt_prefix: str = "",
     ) -> list[dict[str, Any]]:
         """Build a model transcript while preserving the fresh-turn boundary."""
         root = workspace or self.workspace
@@ -275,12 +276,16 @@ class ContextBuilder:
             messages: list[dict[str, Any]] = [
                 {
                     "role": "system",
-                    "content": self.build_system_prompt(
-                        channel=channel,
-                        session_summary=transcript.session_summary,
-                        workspace=root,
-                        include_memory=include_memory,
-                    ) + ("\n\n" + instructions if instructions else ""),
+                    "content": "\n\n".join(part for part in (
+                        system_prompt_prefix,
+                        self.build_system_prompt(
+                            channel=channel,
+                            session_summary=transcript.session_summary,
+                            workspace=root,
+                            include_memory=include_memory,
+                        ),
+                        instructions,
+                    ) if part),
                 },
                 *transcript.history,
             ]

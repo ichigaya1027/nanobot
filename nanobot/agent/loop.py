@@ -1263,6 +1263,7 @@ class AgentLoop:
             workspace=effective_scope.project_path,
             include_memory=session.policy.persist if session is not None else True,
             instructions=request_ctx.turn_policy.instructions if request_ctx.turn_policy else "",
+            system_prompt_prefix=request_ctx.turn_policy.system_prompt_prefix if request_ctx.turn_policy else "",
         )
         if request_context is None:
             request_ctx = dataclasses.replace(

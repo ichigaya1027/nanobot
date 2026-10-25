@@ -16,6 +16,7 @@ class TurnPolicy:
     observe_input: Callable[[InboundMessage], None] | None = None
     completed: Callable[[], None] | None = None
     prepare_messages: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None
+    system_prompt_prefix: str = ""
 
 
 TurnPolicyProvider = Callable[[InboundMessage, str, ToolRegistry], TurnPolicy | None]

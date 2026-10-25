@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
+from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
     from nanobot.channels.napcat.group_agent import GroupMessage
+
+BEIJING_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 def _compact(value: object) -> str:
@@ -34,7 +37,7 @@ def _segment(segment: dict[str, Any]) -> str:
     if kind == "reply":
         identity = f" ({_inline(data['sender_id'])}){_inline(data.get('sender_name', ''))}" if data.get("sender_id") else ""
         timestamp = (
-            " " + datetime.fromtimestamp(int(data["time"]), timezone.utc).isoformat(timespec="minutes").replace("+00:00", "Z")
+            " " + datetime.fromtimestamp(int(data["time"]), BEIJING_TIMEZONE).strftime("%Y/%m/%d %H:%M")
             if data.get("time") else ""
         )
         text = str(data.get("text") or "")
@@ -70,9 +73,9 @@ def render_group_messages(messages: Sequence[GroupMessage]) -> str:
     previous_minute: datetime | None = None
     previous_sender: tuple[str, str] | None = None
     for message in sorted(messages, key=lambda item: item.timestamp):
-        minute = datetime.fromtimestamp(message.timestamp, timezone.utc).replace(second=0, microsecond=0)
+        minute = datetime.fromtimestamp(message.timestamp, BEIJING_TIMEZONE).replace(second=0, microsecond=0)
         if previous_minute is None or minute.date() != previous_minute.date():
-            timestamp = minute.isoformat(timespec="minutes").replace("+00:00", "Z")
+            timestamp = minute.strftime("%Y/%m/%d %H:%M")
             time_prefix = f"[{timestamp}] "
         elif minute != previous_minute:
             time_prefix = f"[{minute:%H:%M}] "

@@ -435,4 +435,10 @@ def group_turn_policy(
     return TurnPolicy(
         registry, render_template("agent/qq_group_policy.md"), True, run.observe, run.complete,
         prepare_messages=prepare_group_context,
+        system_prompt_prefix=(
+            "QQ 群消息格式说明（北京时间）："
+            "每条消息行格式为 `[YYYY/MM/DD HH:MM] (QQ号)昵称 #消息编号: 正文`；"
+            "同一分钟的后续消息省略时间，紧接的同一发送者消息省略昵称。"
+            "行内 `#消息编号` 是当前消息 ID，`[reply #编号 ...]` 中的编号是被引用消息 ID。"
+        ),
     )
