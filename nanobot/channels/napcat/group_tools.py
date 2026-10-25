@@ -228,14 +228,20 @@ class QQGroupTool(Tool):
         required: list[str] = []
         if self.name in {"send_message", "reply_message"}:
             fields.update({
-                "content": {"type": "string"},
+                "content": {
+                    "type": "string",
+                    "description": "要实际发送到 QQ 群的文字。你在工具调用之外直接写出的文字不会发送到群里。",
+                },
                 "media": {"type": "array", "items": {"type": "string"}},
                 "mentions": {"type": "array", "items": {"type": "string"}},
             })
             required.append("content")
         if self.name == "send_voice":
             fields.update({
-                "text": {"type": "string", "minLength": 1},
+                "text": {
+                    "type": "string", "minLength": 1,
+                    "description": "要合成为语音并实际发送到 QQ 群的文字。你在工具调用之外直接写出的文字不会发送到群里。",
+                },
                 "instruction": {"type": "string", "description": "Optional speaking style, emotion or delivery instruction for synthesis."},
             })
             required.append("text")
