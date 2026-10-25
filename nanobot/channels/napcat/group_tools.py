@@ -130,6 +130,8 @@ class GroupRun:
     async def send(self, content: str, media: list[str], reply: str, mentions: list[str]) -> dict[str, Any]:
         segments: list[dict[str, Any]] = []
         if reply:
+            if reply not in self.messages and reply not in self.sent_ids and reply.startswith("#"):
+                reply = reply[1:]
             if reply not in self.messages and reply not in self.sent_ids:
                 raise ValueError("Read the target message in this group before replying to it")
             if reply in self.messages and not self.messages[reply].targetable:
@@ -190,7 +192,7 @@ class GroupRun:
 _DESCRIPTIONS = {
     "send_message": "Send a message to the active QQ group, optionally with images and mentions.",
     "send_voice": "Synthesize text with the configured voice and send one native voice message to the active QQ group. Optionally give a speaking-style instruction. A successful result confirms the QQ send receipt.",
-    "reply_message": "Reply to an observed or retrieved message in the active QQ group.",
+    "reply_message": "Reply to an observed or retrieved message in the active QQ group. The message_id may include or omit a leading #.",
     "react_message": "Add an emoji reaction to an observed or retrieved group message.",
     "poke_user": "Poke a user observed in the active QQ group.",
     "stay_silent": "End this response without another visible action. Previously completed actions remain.",
