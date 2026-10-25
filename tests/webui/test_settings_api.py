@@ -932,6 +932,7 @@ def test_create_provider_settings_persists_custom_advanced_options(
         "extra_query",
         "proxy",
         "thinking_style",
+        "send_history_reasoning",
     ]
     assert row["extra_headers"] == {"X-Tenant": "engineering"}
     assert row["extra_body"] == {"service_tier": "priority"}
