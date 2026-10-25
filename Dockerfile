@@ -13,7 +13,9 @@ RUN mkdir -p /app/nanobot/web && npm run build
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-RUN apt-get update && \
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl git bubblewrap openssh-client libmagic1 && \
     rm -rf /var/lib/apt/lists/*
 
