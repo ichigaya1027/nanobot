@@ -150,6 +150,7 @@ def _make_provider_core(
             extra_query=p.extra_query if p else None,
             proxy=p.proxy if p else None,
             provider_name=provider_name,
+            send_history_reasoning=p.send_history_reasoning if p else True,
         )
 
     provider.generation = preset.to_generation_settings()
@@ -263,6 +264,7 @@ def _preset_provider_signature(
         preset.api.model_dump_json() if preset.api is not None else None,
         getattr(provider_config, "proxy", None) if provider_config else None,
         provider_config.thinking_style if provider_config else None,
+        provider_config.send_history_reasoning if provider_config else True,
     )
 
 

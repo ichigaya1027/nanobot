@@ -429,6 +429,23 @@ function ProviderAdvancedOptions({
         <div className="space-y-3 py-3">
           {children}
           <div className="grid gap-3 md:grid-cols-2">
+            {enabled.has("send_history_reasoning") ? (
+              <div className="flex items-center justify-between gap-4 px-3 py-2 md:col-span-2">
+                <div>
+                  <div className="text-[13px] font-medium text-foreground">
+                    {t("settings.providers.sendHistoryReasoning")}
+                  </div>
+                  <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                    {t("settings.providers.sendHistoryReasoningHelp")}
+                  </p>
+                </div>
+                <ToggleButton
+                  checked={form.sendHistoryReasoning}
+                  onChange={(sendHistoryReasoning) => onChange({ sendHistoryReasoning })}
+                  label={t("settings.providers.sendHistoryReasoning")}
+                />
+              </div>
+            ) : null}
             {enabled.has("thinking_style") ? (
               <label className="block space-y-1.5">
                 <span className="block px-3 text-[12px] font-medium text-muted-foreground">
@@ -685,6 +702,7 @@ export function ProvidersSettings({
       || form.extraBody.trim()
       || form.extraQuery.trim()
       || form.thinkingStyle.trim()
+      || !form.sendHistoryReasoning
       || form.region.trim()
       || form.profile.trim(),
     );
@@ -1039,7 +1057,9 @@ export function ProvidersSettings({
           </div>
         </label>
         <ProviderAdvancedOptions
-          fields={CUSTOM_PROVIDER_ADVANCED_FIELDS}
+          fields={settings.providers.some((provider) => provider.advanced_fields?.includes("send_history_reasoning"))
+            ? [...CUSTOM_PROVIDER_ADVANCED_FIELDS, "send_history_reasoning"]
+            : CUSTOM_PROVIDER_ADVANCED_FIELDS}
           form={customProviderDraft}
           onChange={(value) =>
             setCustomProviderDraft((current) => ({ ...current, ...value }))

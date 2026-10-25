@@ -1380,6 +1380,8 @@
       "openaiDefaultAPIDescription": "Sets the default API for presets using Auto. Auto here follows known model rules. Individual presets can override this choice.",
       "proxy": "Network proxy",
       "thinkingStyle": "Reasoning format",
+      "sendHistoryReasoning": "Replay past reasoning",
+      "sendHistoryReasoningHelp": "Include reasoning from completed turns. Turning this off preserves reasoning needed by tool calls in the current turn.",
       "region": "Region",
       "profile": "AWS profile",
       "extraHeaders": "Headers",

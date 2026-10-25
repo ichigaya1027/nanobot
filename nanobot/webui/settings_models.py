@@ -146,6 +146,12 @@ def _provider_config_updates(query: QueryParams) -> dict[str, Any]:
             value = (query_first_alias(query, snake, camel) or "").strip()
             updates[snake] = value or None
 
+    if query_has_alias(query, "send_history_reasoning", "sendHistoryReasoning"):
+        updates["send_history_reasoning"] = parse_bool(
+            query_first_alias(query, "send_history_reasoning", "sendHistoryReasoning") or "",
+            "sendHistoryReasoning",
+        )
+
     for snake, camel in (
         ("extra_headers", "extraHeaders"),
         ("extra_body", "extraBody"),
@@ -355,6 +361,8 @@ def _provider_advanced_field_names(name: str, spec: Any) -> list[str]:
         fields.extend(("region", "profile"))
     if find_by_name(name) is None:
         fields.append("thinking_style")
+    if spec.backend == "openai_compat" and not spec.strip_history_reasoning_content:
+        fields.append("send_history_reasoning")
     return fields
 
 
@@ -396,6 +404,7 @@ def _provider_settings_row(
         "extra_body": request_settings.redact_request_secrets(provider_config.extra_body),
         "extra_query": request_settings.redact_request_secrets(provider_config.extra_query),
         "thinking_style": provider_config.thinking_style,
+        "send_history_reasoning": provider_config.send_history_reasoning,
         "region": getattr(provider_config, "region", None),
         "profile": getattr(provider_config, "profile", None),
         "proxy": provider_config.proxy,
@@ -1610,6 +1619,7 @@ def create_provider_settings(config: Config, query: QueryParams) -> str:
         "extra_body",
         "extra_query",
         "thinking_style",
+        "send_history_reasoning",
         "display_name",
         "api",
     }

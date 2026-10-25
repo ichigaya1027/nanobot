@@ -950,6 +950,8 @@
       "openaiDefaultAPIDescription": "자동을 사용하는 프리셋의 기본 API를 설정합니다. 여기서 자동을 선택하면 알려진 모델 규칙을 따릅니다. 개별 프리셋에서 이 설정을 바꿀 수 있습니다.",
       "proxy": "네트워크 프록시",
       "thinkingStyle": "추론 형식",
+      "sendHistoryReasoning": "이전 사고 내용 재전송",
+      "sendHistoryReasoningHelp": "완료된 턴의 사고 내용을 포함합니다. 꺼도 현재 턴의 도구 호출에 필요한 사고 내용은 유지됩니다.",
       "region": "리전",
       "profile": "AWS 프로필",
       "extraHeaders": "헤더",

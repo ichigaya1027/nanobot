@@ -950,6 +950,8 @@
       "openaiDefaultAPIDescription": "Définit l’API par défaut des préréglages utilisant Auto. Ici, Auto suit les règles connues du modèle. Chaque préréglage peut modifier ce choix.",
       "proxy": "Proxy réseau",
       "thinkingStyle": "Format du raisonnement",
+      "sendHistoryReasoning": "Renvoyer le raisonnement passé",
+      "sendHistoryReasoningHelp": "Inclut le raisonnement des tours terminés. Le désactiver conserve celui nécessaire aux outils du tour en cours.",
       "region": "Région",
       "profile": "Profil AWS",
       "extraHeaders": "En-têtes",

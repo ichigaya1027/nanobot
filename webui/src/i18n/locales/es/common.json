@@ -950,6 +950,8 @@
       "openaiDefaultAPIDescription": "Define la API predeterminada para los preajustes que usan Auto. Aquí, Auto sigue las reglas conocidas del modelo. Cada preajuste puede cambiar esta elección.",
       "proxy": "Proxy de red",
       "thinkingStyle": "Formato de razonamiento",
+      "sendHistoryReasoning": "Reenviar razonamiento anterior",
+      "sendHistoryReasoningHelp": "Incluye el razonamiento de turnos completados. Al desactivarlo, se conserva el necesario para las herramientas del turno actual.",
       "region": "Región",
       "profile": "Perfil de AWS",
       "extraHeaders": "Cabeceras",

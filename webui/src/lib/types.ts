@@ -755,6 +755,7 @@ export interface SettingsPayload {
       | "extra_query"
       | "proxy"
       | "thinking_style"
+      | "send_history_reasoning"
       | "region"
       | "profile"
     >;
@@ -762,6 +763,7 @@ export interface SettingsPayload {
     extra_body?: Record<string, unknown> | null;
     extra_query?: Record<string, string> | null;
     thinking_style?: string | null;
+    send_history_reasoning?: boolean;
     region?: string | null;
     profile?: string | null;
   }>;
@@ -1387,6 +1389,7 @@ export interface ProviderSettingsUpdate {
   extraBody?: string;
   extraQuery?: string;
   thinkingStyle?: string;
+  sendHistoryReasoning?: boolean;
   region?: string;
   profile?: string;
 }
@@ -1401,6 +1404,7 @@ export interface ProviderCreationUpdate {
   extraBody?: string;
   extraQuery?: string;
   thinkingStyle?: string;
+  sendHistoryReasoning?: boolean;
 }
 
 export interface WebSearchSettingsUpdate {

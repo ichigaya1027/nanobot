@@ -450,6 +450,9 @@ export function useModelSettingsActions({
         if (field === "thinking_style") {
           update.thinkingStyle = providerForm.thinkingStyle.trim();
         }
+        if (field === "send_history_reasoning") {
+          update.sendHistoryReasoning = providerForm.sendHistoryReasoning;
+        }
         if (field === "region") update.region = providerForm.region.trim();
         if (field === "profile") update.profile = providerForm.profile.trim();
       }
@@ -490,6 +493,8 @@ export function useModelSettingsActions({
         extraBody: draft.extraBody.trim(),
         extraQuery: draft.extraQuery.trim(),
         thinkingStyle: draft.thinkingStyle.trim(),
+        ...(settings?.providers.some((provider) => provider.advanced_fields?.includes("send_history_reasoning"))
+          ? { sendHistoryReasoning: draft.sendHistoryReasoning } : {}),
       });
       applyPayload(payload, { preserveAgentForm: true });
       setError(null);

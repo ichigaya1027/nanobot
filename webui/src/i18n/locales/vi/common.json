@@ -950,6 +950,8 @@
       "openaiDefaultAPIDescription": "Đặt API mặc định cho cấu hình sẵn dùng Tự động. Chọn Tự động tại đây sẽ áp dụng quy tắc đã biết của mô hình. Mỗi cấu hình sẵn có thể thay đổi lựa chọn này.",
       "proxy": "Proxy mạng",
       "thinkingStyle": "Định dạng suy luận",
+      "sendHistoryReasoning": "Gửi lại suy luận trước đó",
+      "sendHistoryReasoningHelp": "Gửi suy luận từ các lượt đã hoàn tất. Khi tắt, vẫn giữ suy luận cần cho công cụ trong lượt hiện tại.",
       "region": "Khu vực",
       "profile": "Hồ sơ AWS",
       "extraHeaders": "Header",

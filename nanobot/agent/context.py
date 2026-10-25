@@ -273,6 +273,7 @@ class ContextBuilder:
         """Build a model transcript while preserving the fresh-turn boundary."""
         root = workspace or self.workspace
         with self.skills.snapshot():
+            # Tag replayed reasoning only; replies appended by the current tool loop stay unmarked.
             messages: list[dict[str, Any]] = [
                 {
                     "role": "system",
@@ -287,7 +288,11 @@ class ContextBuilder:
                         instructions,
                     ) if part),
                 },
-                *transcript.history,
+                *(
+                    {**message, "_history_reasoning": True}
+                    if "reasoning_content" in message else message
+                    for message in transcript.history
+                ),
             ]
             if transcript.current_message is None:
                 return messages

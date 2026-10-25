@@ -1380,6 +1380,8 @@
       "openaiDefaultAPIDescription": "设为「自动」的预设使用此默认协议。此处选择「自动」会遵循已知模型规则；单个预设可以覆盖此默认值。",
       "proxy": "网络代理",
       "thinkingStyle": "推理格式",
+      "sendHistoryReasoning": "回传历史思考",
+      "sendHistoryReasoningHelp": "关闭后省略历史轮次的思考，保留同轮工具调用所需内容。",
       "region": "区域",
       "profile": "AWS 配置名称",
       "extraHeaders": "请求头",
