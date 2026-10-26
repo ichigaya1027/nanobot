@@ -497,11 +497,13 @@ class OpenAICompatProvider(LLMProvider):
         extra_query: dict[str, str] | None = None,
         proxy: str | None = None,
         provider_name: str = "openai",
+        send_history_reasoning: bool = True,
     ):
         super().__init__(api_key, api_base, provider_name=provider_name)
         self.default_model = default_model
         self.extra_headers = extra_headers or {}
         self._spec = spec
+        self._send_history_reasoning = send_history_reasoning
         self._preset_model_api = model_api
         self._extra_body = (
             spec.responses.request_extra_body(extra_body)
@@ -698,6 +700,10 @@ class OpenAICompatProvider(LLMProvider):
         if strip_reasoning:
             for msg in sanitized:
                 msg.pop("reasoning_content", None)
+        elif not self._send_history_reasoning:
+            for source, msg in zip(messages, sanitized, strict=True):
+                if source.get("_history_reasoning") is True:
+                    msg.pop("reasoning_content", None)
         if self._spec and self._spec.name == "gemini":
             sanitized = self._ensure_gemini_thought_signatures(sanitized)
 

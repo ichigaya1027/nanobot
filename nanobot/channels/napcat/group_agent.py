@@ -39,6 +39,7 @@ class GroupMessage:
     real_seq: str = ""
     group_name: str = ""
     targetable: bool = True
+    received_at_ns: int = field(default_factory=time.time_ns)
 
     @classmethod
     def parse(cls, raw: dict[str, Any], media: tuple[str, ...] = ()) -> GroupMessage:
@@ -174,7 +175,13 @@ class GroupObserver:
                 session_key_override=f"{self.channel}:group:{group_id}",
                 content=render_group_messages(ordered),
                 media=[path for message in ordered for path in message.media],
-                metadata={OBSERVATION_KEY: records, "is_group": True},
+                metadata={
+                    OBSERVATION_KEY: records, "is_group": True,
+                    "context_metadata": {"napcat_observation": [
+                        {**record, "received_at_ns": message.received_at_ns, "media": list(message.media)}
+                        for record, message in zip(records, ordered)
+                    ]},
+                },
             ))
 
     async def close(self) -> None:

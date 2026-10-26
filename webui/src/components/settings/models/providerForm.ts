@@ -13,6 +13,7 @@ export type ProviderForm = {
   extraBody: string;
   extraQuery: string;
   thinkingStyle: string;
+  sendHistoryReasoning: boolean;
   region: string;
   profile: string;
 };
@@ -48,6 +49,7 @@ export function providerFormFromRow(
     extraBody: providerJsonValue(provider.extra_body),
     extraQuery: providerJsonValue(provider.extra_query),
     thinkingStyle: provider.thinking_style ?? "",
+    sendHistoryReasoning: provider.send_history_reasoning ?? true,
     region: provider.region ?? "",
     profile: provider.profile ?? "",
   };
@@ -65,6 +67,7 @@ export function emptyCustomProviderDraft(): CustomProviderDraft {
     extraBody: "",
     extraQuery: "",
     thinkingStyle: "",
+    sendHistoryReasoning: true,
     region: "",
     profile: "",
   };

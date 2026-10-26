@@ -1,5 +1,7 @@
 """Model-facing group messages retain usable identities and content boundaries."""
 
+from datetime import datetime
+
 import pytest
 
 from nanobot.bus.queue import MessageBus
@@ -35,9 +37,9 @@ async def test_batch_keeps_structured_observations_and_renders_ordered_message_l
         batch = await bus.consume_inbound()
         assert batch.content.splitlines() == [
             "QQ group 100",
-            "[2023-11-14T22:13Z] (7)Alice\\n管理员 #101: "
+            "[2023/11/15 06:13] (7)Alice\\n管理员 #101: "
             "[reply #99]@42第一行\\n第二行，字面量\\\\n"
-            "[image https://example.com/cat.png][face 76][voice]",
+            "[image: https://example.com/cat.png][face 76][voice]",
             "(8)Bob #4: 收到",
         ]
         observed = batch.metadata[OBSERVATION_KEY]
@@ -54,23 +56,24 @@ def test_repeated_prefixes_are_scoped_to_each_block_and_dates_remain_explicit():
     def text(value):
         return [{"type": "text", "data": {"text": value}}]
 
+    next_day = int(datetime.fromisoformat("2023-11-16T00:00:00+08:00").timestamp())
     messages = [
         GroupMessage("1", "100", "7", 1700000000, "Alice", text("first")),
         GroupMessage("2", "100", "7", 1700000001, "Alice", text("continued")),
         GroupMessage("3", "100", "8", 1700000002, "Bob", text("answer")),
         GroupMessage("4", "100", "8", 1700000041, "Bob", text("next minute")),
-        GroupMessage("5", "100", "8", 1700006400, "Bob", text("next day")),
-        GroupMessage("6", "100", "7", 1700006410, "Alice", text("back")),
+        GroupMessage("5", "100", "8", next_day, "Bob", text("next day")),
+        GroupMessage("6", "100", "7", next_day + 10, "Alice", text("back")),
     ]
     assert render_group_messages(messages).splitlines() == [
         "QQ group 100",
-        "[2023-11-14T22:13Z] (7)Alice #1: first",
+        "[2023/11/15 06:13] (7)Alice #1: first",
         "#2: continued",
         "(8)Bob #3: answer",
-        "[22:14] #4: next minute",
-        "[2023-11-15T00:00Z] #5: next day",
+        "[06:14] #4: next minute",
+        "[2023/11/16 00:00] #5: next day",
         "(7)Alice #6: back",
     ]
     # A query or steer block can start with a sender and minute already seen
     # in another block; it still has to provide its own complete context.
-    assert render_group_messages(messages[1:2]) == "QQ group 100\n[2023-11-14T22:13Z] (7)Alice #2: continued"
+    assert render_group_messages(messages[1:2]) == "QQ group 100\n[2023/11/15 06:13] (7)Alice #2: continued"

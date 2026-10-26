@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +20,7 @@ from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.turn_policy import TurnPolicy
 from nanobot.bus.events import InboundMessage
 from nanobot.channels.napcat.group_agent import OBSERVATION_KEY, GroupMessage, GroupObserver
+from nanobot.channels.napcat.group_context import prepare_group_context
 from nanobot.channels.napcat.group_rendering import render_group_messages
 from nanobot.security.workspace_access import current_tool_workspace
 from nanobot.utils.helpers import strip_think
@@ -128,6 +130,8 @@ class GroupRun:
     async def send(self, content: str, media: list[str], reply: str, mentions: list[str]) -> dict[str, Any]:
         segments: list[dict[str, Any]] = []
         if reply:
+            if reply not in self.messages and reply not in self.sent_ids and reply.startswith("#"):
+                reply = reply[1:]
             if reply not in self.messages and reply not in self.sent_ids:
                 raise ValueError("Read the target message in this group before replying to it")
             if reply in self.messages and not self.messages[reply].targetable:
@@ -188,7 +192,7 @@ class GroupRun:
 _DESCRIPTIONS = {
     "send_message": "Send a message to the active QQ group, optionally with images and mentions.",
     "send_voice": "Synthesize text with the configured voice and send one native voice message to the active QQ group. Optionally give a speaking-style instruction. A successful result confirms the QQ send receipt.",
-    "reply_message": "Reply to an observed or retrieved message in the active QQ group.",
+    "reply_message": "Reply to an observed or retrieved message in the active QQ group. The message_id may include or omit a leading #.",
     "react_message": "Add an emoji reaction to an observed or retrieved group message.",
     "poke_user": "Poke a user observed in the active QQ group.",
     "stay_silent": "End this response without another visible action. Previously completed actions remain.",
@@ -224,14 +228,20 @@ class QQGroupTool(Tool):
         required: list[str] = []
         if self.name in {"send_message", "reply_message"}:
             fields.update({
-                "content": {"type": "string"},
+                "content": {
+                    "type": "string",
+                    "description": "要实际发送到 QQ 群的文字。你在工具调用之外直接写出的文字不会发送到群里。",
+                },
                 "media": {"type": "array", "items": {"type": "string"}},
                 "mentions": {"type": "array", "items": {"type": "string"}},
             })
             required.append("content")
         if self.name == "send_voice":
             fields.update({
-                "text": {"type": "string", "minLength": 1},
+                "text": {
+                    "type": "string", "minLength": 1,
+                    "description": "要合成为语音并实际发送到 QQ 群的文字。你在工具调用之外直接写出的文字不会发送到群里。",
+                },
                 "instruction": {"type": "string", "description": "Optional speaking style, emotion or delivery instruction for synthesis."},
             })
             required.append("text")
@@ -275,15 +285,21 @@ class QQGroupTool(Tool):
                 status = "unknown" if uncertain else "failed"
             else:
                 status = "query_failed"
-            return ToolResult.error(json.dumps({
+            output = ToolResult.error(json.dumps({
                 "status": status, "error": str(error),
                 "note": "An unknown delivery may already have reached QQ; do not blindly resend." if status == "unknown" else "",
             }, ensure_ascii=False))
-        return ToolResult(
-            json.dumps(result, ensure_ascii=False),
-            is_error=bool(result.get("source_error")),
-            end_response=bool(kwargs.get("end_response")) or self.name == "stay_silent",
-        )
+        else:
+            output = ToolResult(
+                json.dumps(result, ensure_ascii=False),
+                is_error=bool(result.get("source_error")),
+                end_response=bool(kwargs.get("end_response")) or self.name == "stay_silent",
+            )
+        if not self.read_only:
+            output.context_metadata = {"napcat_action": {
+                "group_id": self.run.group_id, "completed_at_ns": time.time_ns(),
+            }}
+        return output
 
     async def _execute(self, args: dict[str, Any]) -> dict[str, Any]:
         if self.name == "get_message":
@@ -426,4 +442,11 @@ def group_turn_policy(
         registry.register(GroupMessageAlias(original, QQGroupTool("send_message", run)))
     return TurnPolicy(
         registry, render_template("agent/qq_group_policy.md"), True, run.observe, run.complete,
+        prepare_messages=prepare_group_context,
+        system_prompt_prefix=(
+            "QQ 群消息格式说明（北京时间）："
+            "每条消息行格式为 `[YYYY/MM/DD HH:MM] (QQ号)昵称 #消息编号: 正文`；"
+            "同一分钟的后续消息省略时间，紧接的同一发送者消息省略昵称。"
+            "行内 `#消息编号` 是当前消息 ID，`[reply #编号 ...]` 中的编号是被引用消息 ID。"
+        ),
     )

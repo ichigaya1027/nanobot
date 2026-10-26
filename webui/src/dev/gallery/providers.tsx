@@ -12,7 +12,7 @@ import { useGalleryTranslation } from "./i18n";
 type ProviderRow = SettingsPayload["providers"][number];
 
 const previewProviders: ProviderRow[] = [
-  { name: "custom", label: "Custom", configured: true, auth_type: "api_key", api_key_hint: "••••••••", api_base: "https://api.example.com/v1" },
+  { name: "custom", label: "Custom", configured: true, auth_type: "api_key", api_key_hint: "••••••••", api_base: "https://api.example.com/v1", advanced_fields: ["send_history_reasoning"] },
   { name: "anthropic", label: "Anthropic", configured: true, auth_type: "api_key", api_key_hint: "••••••••", api_base: "https://api.anthropic.com", request_apis: ["anthropic_messages"] },
   { name: "openai_codex", label: "OpenAI Codex", configured: true, auth_type: "oauth", api_key_required: false, oauth_login_supported: true, advanced_fields: ["proxy", "extra_body"] },
   { name: "xai_grok", label: "xAI Grok", configured: true, auth_type: "oauth", api_key_required: false, oauth_login_supported: true, advanced_fields: ["proxy", "extra_body"] },
@@ -49,6 +49,7 @@ function providerValues(form: ProviderForm) {
     extra_query: extraQuery,
     extra_body: extraBody,
     thinking_style: form.thinkingStyle.trim() || null,
+    send_history_reasoning: form.sendHistoryReasoning,
     region: form.region.trim() || null,
     profile: form.profile.trim() || null,
   };

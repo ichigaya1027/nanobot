@@ -950,6 +950,8 @@
       "openaiDefaultAPIDescription": "自動を使うプリセットのデフォルト API を設定します。ここで自動を選ぶと既知のモデルルールに従います。各プリセットでこの設定を変更できます。",
       "proxy": "ネットワークプロキシ",
       "thinkingStyle": "推論の形式",
+      "sendHistoryReasoning": "過去の思考を再送",
+      "sendHistoryReasoningHelp": "完了したターンの思考を含めます。オフでも現在のターンのツール呼び出しに必要な思考は保持します。",
       "region": "リージョン",
       "profile": "AWS プロファイル",
       "extraHeaders": "ヘッダー",

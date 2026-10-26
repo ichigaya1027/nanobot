@@ -386,18 +386,23 @@ def image_placeholder_text(path: str | None, *, empty: str = "[image]") -> str:
     return f"[image: {path}]" if path else empty
 
 
+def image_path_in_text(path: str, text: str) -> bool:
+    """Recognize raw and JSON-escaped file references in message text."""
+    return bool(path) and (path in text or json.dumps(path, ensure_ascii=False)[1:-1] in text)
+
+
 def content_with_media_breadcrumbs(
     role: str | None,
     content: Any,
     media: Any,
 ) -> Any:
-    """Append persisted user-media breadcrumbs to plain-text content."""
+    """Append references for persisted user media not already named in the text."""
     if role != "user" or not isinstance(content, str) or not isinstance(media, list):
         return content
     breadcrumbs = "\n".join(
         image_placeholder_text(path)
         for path in cast(list[object], media)
-        if isinstance(path, str) and path
+        if isinstance(path, str) and path and not image_path_in_text(path, content)
     )
     if not breadcrumbs:
         return content

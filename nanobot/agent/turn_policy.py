@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.bus.events import InboundMessage
@@ -14,6 +15,8 @@ class TurnPolicy:
     tool_only_output: bool = False
     observe_input: Callable[[InboundMessage], None] | None = None
     completed: Callable[[], None] | None = None
+    prepare_messages: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None
+    system_prompt_prefix: str = ""
 
 
 TurnPolicyProvider = Callable[[InboundMessage, str, ToolRegistry], TurnPolicy | None]

@@ -64,6 +64,7 @@ class TranscriptInput:
     current_role: str = "user"
     session_summary: SessionSummary | None = None
     runtime_context_blocks: Sequence[RuntimeContextBlock] | None = None
+    context_metadata: dict[str, Any] | None = None
 
     @property
     def message_count(self) -> int:
@@ -267,21 +268,31 @@ class ContextBuilder:
         workspace: Path | None = None,
         include_memory: bool = True,
         instructions: str = "",
+        system_prompt_prefix: str = "",
     ) -> list[dict[str, Any]]:
         """Build a model transcript while preserving the fresh-turn boundary."""
         root = workspace or self.workspace
         with self.skills.snapshot():
+            # Tag replayed reasoning only; replies appended by the current tool loop stay unmarked.
             messages: list[dict[str, Any]] = [
                 {
                     "role": "system",
-                    "content": self.build_system_prompt(
-                        channel=channel,
-                        session_summary=transcript.session_summary,
-                        workspace=root,
-                        include_memory=include_memory,
-                    ) + ("\n\n" + instructions if instructions else ""),
+                    "content": "\n\n".join(part for part in (
+                        system_prompt_prefix,
+                        self.build_system_prompt(
+                            channel=channel,
+                            session_summary=transcript.session_summary,
+                            workspace=root,
+                            include_memory=include_memory,
+                        ),
+                        instructions,
+                    ) if part),
                 },
-                *transcript.history,
+                *(
+                    {**message, "_history_reasoning": True}
+                    if "reasoning_content" in message else message
+                    for message in transcript.history
+                ),
             ]
             if transcript.current_message is None:
                 return messages
@@ -292,6 +303,8 @@ class ContextBuilder:
                 current_role=transcript.current_role,
                 runtime_context_blocks=transcript.runtime_context_blocks,
             )
+            if transcript.context_metadata is not None:
+                current["context_metadata"] = transcript.context_metadata
             messages.append(current)
             return messages
 

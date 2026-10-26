@@ -17,6 +17,8 @@ The Python gateway owns agent execution, sessions, tools, memory, and security p
 
 ## Development constraints
 
+- For this fork, keep topic branches local, integrate them into `main` locally with rebase and fast-forward, and push only `main` to `origin`. Keep new history linear; do not create merge commits.
+- Use fictional identifiers and reserved example domains in documentation, examples, tests, and commit messages. Never commit real QQ/user/group IDs, private chat content, private hosts/IPs, personal filesystem paths, credentials, or account-specific resource IDs. Keep deployment values outside the repository, and inspect changes for personal information before committing or pushing.
 - Analyze the required behavior, state ownership, and root cause before extending existing code. Refactor when the structure causes the problem; a smaller diff does not justify another fallback.
 - Do not add defensive tests for hypothetical internal states or unsupported combinations. Each new test needs a reachable path and a meaningful contract to protect.
 - Do not run `ruff format`; mechanical formatting obscures git blame and creates unrelated diffs. This constraint takes precedence over the optional touched-file formatting in `CONTRIBUTING.md`.

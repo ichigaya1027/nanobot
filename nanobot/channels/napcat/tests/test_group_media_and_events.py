@@ -50,7 +50,8 @@ async def test_poking_bot_wakes_directed_observation_but_is_not_a_quote_target(t
 
 
 @pytest.mark.asyncio
-async def test_batch_and_query_enrich_group_mentions_quotes_and_original_image_paths(tmp_path):
+@pytest.mark.parametrize("tool", ["get_message", "get_chat_history"])
+async def test_batch_and_query_enrich_group_mentions_quotes_and_original_image_paths(tmp_path, tool):
     ch = channel()
     image_path = (tmp_path / "original.png").as_posix()
     ch._download_image = AsyncMock(return_value=image_path)
@@ -67,6 +68,8 @@ async def test_batch_and_query_enrich_group_mentions_quotes_and_original_image_p
             return {"data": {"nickname": "Bob"}}
         if name == "get_msg":
             return {"data": message(99, text="earlier question", sender={"nickname": "Alice"}) if str(args["message_id"]) == "99" else raw}
+        if name == "get_group_msg_history":
+            return {"data": {"messages": [raw]}}
         raise AssertionError(name)
 
     ch._call_action = AsyncMock(side_effect=action)
@@ -75,17 +78,24 @@ async def test_batch_and_query_enrich_group_mentions_quotes_and_original_image_p
         await ch.group_observer.flush("100")
         batch = await ch.bus.consume_inbound()
         assert batch.content.startswith("QQ group 100 Development\n")
-        assert "[reply #99 (7)Alice 2023-11-14T22:14Z: earlier question]@8(Bob)" in batch.content
-        assert f"original={image_path}" in batch.content
-        assert "https://example.com/original.png" in batch.content
+        assert "[reply #99 (7)Alice 2023/11/15 06:14: earlier question]@8(Bob)" in batch.content
+        assert batch.content.count(f"[image: {image_path}]") == 1
+        assert "https://example.com/original.png" not in batch.content
         assert batch.media == [image_path]
+        image_record = next(
+            segment for segment in batch.metadata[OBSERVATION_KEY][0]["message"]
+            if segment["type"] == "image"
+        )
+        assert image_record["data"]["url"] == "https://example.com/original.png"
         assert raw["message"][0]["data"] == {"id": "99"}
         policy = ch.turn_policy(batch, batch.session_key, ToolRegistry())
         assert policy is not None
         with request_context(RequestContext("napcat", "group:100", workspace=tmp_path)):
-            queried = await policy.tools.execute("get_message", {"message_id": "1"})
-            text = json.loads(queried)["message"]
+            queried = await policy.tools.execute(tool, {"message_id": "1"} if tool == "get_message" else {"count": 1})
+            text = json.loads(queried)["message" if tool == "get_message" else "messages"]
             assert "Development" in text and "@8(Bob)" in text and "earlier question" in text
+            assert text.count(f"[image: {image_path}]") == 1
+            assert "https://example.com/original.png" not in text
     finally:
         await ch.stop()
 

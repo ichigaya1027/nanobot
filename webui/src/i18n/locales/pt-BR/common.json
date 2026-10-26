@@ -1194,6 +1194,8 @@
       "openaiDefaultAPIDescription": "Define a API padrão das predefinições que usam Auto. Aqui, Auto segue as regras conhecidas do modelo. Cada predefinição pode alterar essa escolha.",
       "proxy": "Proxy de rede",
       "thinkingStyle": "Formato de raciocínio",
+      "sendHistoryReasoning": "Reenviar raciocínio anterior",
+      "sendHistoryReasoningHelp": "Inclui o raciocínio de turnos concluídos. Desativar preserva o necessário para ferramentas no turno atual.",
       "region": "Região",
       "profile": "Perfil da AWS",
       "extraHeaders": "Cabeçalhos",

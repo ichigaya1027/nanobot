@@ -125,6 +125,7 @@ class AgentRunSpec:
     provider_state: ProviderConversationState | None = None
     llm_usage_source: LLMUsageSource | None = None
     events: EventSink = NO_EVENTS
+    prepare_messages: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None
 
 
 @dataclass(slots=True)
@@ -449,6 +450,7 @@ class AgentRunner:
             max_tool_result_chars=spec.max_tool_result_chars,
             context_window_tokens=spec.runtime.context_window_tokens,
             max_tokens=spec.runtime.generation.max_tokens,
+            prepare_messages=spec.prepare_messages,
         )
         request_state = ModelRequestState(
             config=governance_config,
@@ -593,6 +595,8 @@ class AgentRunner:
                             result,
                         ),
                     }
+                    if isinstance(result, ToolResult) and result.context_metadata is not None:
+                        tool_message["context_metadata"] = result.context_metadata
                     messages.append(tool_message)
                     completed_tool_results.append(tool_message)
                 checkpoint_model_messages = (

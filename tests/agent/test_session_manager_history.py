@@ -1,3 +1,5 @@
+import pytest
+
 from nanobot.runtime_context import (
     RUNTIME_CONTEXT_HISTORY_META,
     RuntimeContextBlock,
@@ -437,6 +439,21 @@ def test_get_history_synthesizes_breadcrumb_for_image_only_turn():
     history = session.get_history(max_messages=500)
 
     assert history[0] == {"role": "user", "content": "[image: /m/pic.png]"}
+
+
+@pytest.mark.parametrize(("path", "reference"), [
+    ("/media/cat.png", "/media/cat.png"),
+    (r"C:\media\cat.png", r"C:\\media\\cat.png"),
+])
+def test_reloaded_history_reuses_inline_image_reference(tmp_path, path, reference):
+    content = f"QQ group 100\n#1: [image: {reference}]"
+    manager = SessionManager(tmp_path)
+    session = manager.get_or_create("napcat:group:100")
+    session.add_message("user", content, media=[path, "/media/second.png"])
+    manager.save(session)
+
+    restored = SessionManager(tmp_path).get_or_create("napcat:group:100")
+    assert restored.get_history()[0]["content"] == content + "\n[image: /media/second.png]"
 
 
 def test_get_history_synthesizes_cli_app_attachment_breadcrumb():

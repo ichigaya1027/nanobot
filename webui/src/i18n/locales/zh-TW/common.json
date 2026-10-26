@@ -950,6 +950,8 @@
       "openaiDefaultAPIDescription": "設為「自動」的預設使用此預設協定。此處選擇「自動」會遵循已知模型規則；個別預設可以覆寫此預設值。",
       "proxy": "網路代理",
       "thinkingStyle": "推理格式",
+      "sendHistoryReasoning": "回傳歷史思考",
+      "sendHistoryReasoningHelp": "關閉後省略歷史輪次的思考，保留同輪工具呼叫所需內容。",
       "region": "區域",
       "profile": "AWS 設定檔名稱",
       "extraHeaders": "請求頭",

@@ -950,6 +950,8 @@
       "openaiDefaultAPIDescription": "Menetapkan API default untuk preset yang memakai Otomatis. Otomatis di sini mengikuti aturan model yang sudah diketahui. Setiap preset dapat mengubah pilihan ini.",
       "proxy": "Proksi jaringan",
       "thinkingStyle": "Format penalaran",
+      "sendHistoryReasoning": "Kirim ulang penalaran sebelumnya",
+      "sendHistoryReasoningHelp": "Sertakan penalaran dari giliran yang selesai. Jika dimatikan, penalaran yang dibutuhkan alat pada giliran saat ini tetap disertakan.",
       "region": "Wilayah",
       "profile": "Profil AWS",
       "extraHeaders": "Header",
