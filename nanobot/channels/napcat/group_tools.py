@@ -267,9 +267,9 @@ class QQGroupTool(Tool):
                 "max_pages": {"type": "integer", "minimum": 1, "maximum": 20},
             })
         if not self.read_only and self.name != "stay_silent":
-            fields["end_response"] = {
+            fields["continue_response"] = {
                 "type": "boolean", "default": False,
-                "description": "Set true when this response's tool calls complete your planned reply or action; false when you need a successful result for further work. The runtime executes all calls and skips the next model request only if all succeed. Any failed or unknown outcome returns all results to you. No extra turn is needed to verify success or acknowledge sending.",
+                "description": "Default false: finish after this response's tool calls succeed. Set true only when you need their results for further work; the runtime executes the entire tool group before calling the model again. Queries, failed calls, and unknown outcomes return results to the model for handling. No extra model request is needed to verify success or acknowledge sending.",
             }
         return {"type": "object", "properties": fields, "required": required, "additionalProperties": False}
 
@@ -293,7 +293,7 @@ class QQGroupTool(Tool):
             output = ToolResult(
                 json.dumps(result, ensure_ascii=False),
                 is_error=bool(result.get("source_error")),
-                end_response=bool(kwargs.get("end_response")) or self.name == "stay_silent",
+                continue_response=self.read_only or kwargs.get("continue_response", False) is True,
             )
         if not self.read_only:
             output.context_metadata = {"napcat_action": {

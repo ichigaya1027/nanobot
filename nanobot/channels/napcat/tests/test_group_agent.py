@@ -146,7 +146,7 @@ async def test_history_reports_actual_scan_and_rejects_other_groups(tmp_path):
         assert parsed["complete"] is False
         assert parsed["stop_reason"] == "no_progress"
         reply = await policy.tools.execute("reply_message", {
-            "message_id": "3", "content": "found", "end_response": True,
+            "message_id": "3", "content": "found",
         })
         assert not reply.is_error
         rejected = await policy.tools.execute("get_message", {"message_id": "9"})
@@ -198,11 +198,11 @@ async def test_runtime_steer_updates_reply_targets_and_avoids_final_roundtrip(tm
             await ch.group_observer.flush("100")
             await pending.put(await ch.bus.consume_inbound())
             return LLMResponse(content="internal preamble", tool_calls=[
-                ToolCallRequest(id="a", name="react_message", arguments={"message_id": "1", "emoji_id": "76"}),
+                ToolCallRequest(id="a", name="react_message", arguments={"message_id": "1", "emoji_id": "76", "continue_response": True}),
             ])
         if len(calls) == 2:
             return LLMResponse(content=None, tool_calls=[
-                ToolCallRequest(id="b", name="reply_message", arguments={"message_id": "2", "content": "answer", "end_response": True}),
+                ToolCallRequest(id="b", name="reply_message", arguments={"message_id": "2", "content": "answer"}),
             ])
         raise AssertionError("Unexpected extra model call")
 
@@ -293,7 +293,7 @@ async def test_real_websocket_observation_action_ack_and_self_echo(tmp_path):
         provider.estimate_prompt_tokens.return_value = (1000, "test")
         provider.aclose = AsyncMock()
         provider.chat_stream_with_retry = AsyncMock(return_value=LLMResponse(content=None, tool_calls=[
-            ToolCallRequest(id="send", name="send_message", arguments={"content": "visible answer", "end_response": True}),
+            ToolCallRequest(id="send", name="send_message", arguments={"content": "visible answer"}),
         ]))
         loop = AgentLoop(bus=ch.bus, provider=provider, workspace=tmp_path, model="test-model")
         loop.turn_policy_provider = ch.turn_policy
@@ -351,7 +351,7 @@ async def test_unknown_delivery_and_partial_query_are_errors(tmp_path):
     policy = ch.turn_policy(InboundMessage("napcat", "7", "group:100", ""), "napcat:group:100", ToolRegistry())
     assert policy is not None
     with request_context(RequestContext("napcat", "group:100", workspace=tmp_path)):
-        action = await policy.tools.execute("send_message", {"content": "answer", "end_response": True})
+        action = await policy.tools.execute("send_message", {"content": "answer"})
         assert action.is_error
         assert json.JSONDecoder().raw_decode(action)[0]["status"] == "unknown"
         history = await policy.tools.execute("search_chat_history", {"keyword": "match"})
@@ -380,7 +380,7 @@ async def test_message_alias_uses_group_action_and_silence_is_normal_completion(
         other_destination.assert_not_awaited()
         silent = await policy.tools.execute("stay_silent", {})
         assert not silent.is_error
-        assert silent.end_response
+        assert not silent.continue_response
     await ch.stop()
 
 
