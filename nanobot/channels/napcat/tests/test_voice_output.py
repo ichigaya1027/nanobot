@@ -74,10 +74,10 @@ async def test_voice_action_sends_native_record_and_returns_receipt(voice_config
     assert policy is not None
     try:
         result = await policy.tools.execute("send_voice", {
-            "text": "Hello traveler", "instruction": "Speak cheerfully", "end_response": True,
+            "text": "Hello traveler", "instruction": "Speak cheerfully",
         })
         assert json.loads(result) == {"status": "succeeded", "message_id": "88"}
-        assert result.end_response
+        assert not result.continue_response
         action, params = ch._call_action.await_args.args
         assert action == "send_msg"
         assert params["message_type"] == "group" and params["group_id"] == "100"
@@ -109,9 +109,9 @@ async def test_unsuccessful_voice_delivery_is_not_a_successful_end(voice_config,
     policy = ch.turn_policy(group_input(), "napcat:group:100", ToolRegistry())
     assert policy is not None
     try:
-        result = await policy.tools.execute("send_voice", {"text": "Hello traveler", "end_response": True})
+        result = await policy.tools.execute("send_voice", {"text": "Hello traveler"})
         assert result.is_error
-        assert not result.end_response
+        assert result.continue_response
         assert json.JSONDecoder().raw_decode(result)[0]["status"] == status
     finally:
         await ch.stop()
@@ -128,8 +128,8 @@ async def test_synthesis_failure_does_not_submit_a_qq_send(voice_config, monkeyp
     policy = ch.turn_policy(group_input(), "napcat:group:100", ToolRegistry())
     assert policy is not None
     try:
-        result = await policy.tools.execute("send_voice", {"text": "Hello traveler", "end_response": True})
-        assert result.is_error and not result.end_response
+        result = await policy.tools.execute("send_voice", {"text": "Hello traveler"})
+        assert result.is_error and result.continue_response
         assert json.JSONDecoder().raw_decode(result)[0]["status"] == "failed"
         ch._call_action.assert_not_awaited()
     finally:
@@ -149,7 +149,7 @@ async def test_voice_reply_finishes_without_another_model_request(voice_config, 
     provider.chat_stream_with_retry = AsyncMock(side_effect=[
         LLMResponse(content=None, tool_calls=[
             ToolCallRequest(id="voice", name="send_voice", arguments={
-                "text": "Hello traveler", "end_response": True,
+                "text": "Hello traveler",
             }),
         ]),
         LLMResponse(content="unexpected extra model request"),

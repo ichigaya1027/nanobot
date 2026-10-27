@@ -64,7 +64,7 @@ NapCat 已原生支持 OneBot `record` 消息段，并承担音频转 Silk、上
 
 MP3 和带文件头的 WAV 可以交给该解码流程；nanobot 无需先转换成 OGG 或 Silk。Exec 适配器给 FFmpeg 传入 `-i inputFile`，输出使用单声道、24 kHz、`ntsilk_s16le`；Addon 适配器同样只接受输入和输出文件路径。无头 PCM 缺少采样率、声道数和采样格式信息，这条接口没有为输入提供这些参数，因此不能将“返回任意 PCM 字节”视为已支持。若已选定的 TTS API 可返回 MP3/WAV，优先选择其一；若只返回 PCM，需先确认其确切参数并封装成 WAV。[Exec 适配器](https://github.com/NapNeko/NapCatQQ/blob/main/packages/napcat-core/helper/ffmpeg/ffmpeg-exec-adapter.ts)、[Addon 适配器](https://github.com/NapNeko/NapCatQQ/blob/main/packages/napcat-core/helper/ffmpeg/ffmpeg-addon-adapter.ts)
 
-转码错误会向上抛出。发送动作应将其作为本次语音发送失败返回，继续遵守既有工具结果与 `end_response` 判定；不应自动改发文字来制造另一项模型没有选择的动作。NapCat 自己的编码用例也明确验证了转码错误传播。[编码入口与用例](https://github.com/NapNeko/NapCatQQ/blob/main/packages/napcat-test/audioEncoding.test.ts)
+转码错误会向上抛出。发送动作应将其作为本次语音发送失败返回，继续遵守既有工具结果与 `continue_response` 判定；不应自动改发文字来制造另一项模型没有选择的动作。NapCat 自己的编码用例也明确验证了转码错误传播。[编码入口与用例](https://github.com/NapNeko/NapCatQQ/blob/main/packages/napcat-test/audioEncoding.test.ts)
 
 ### 语音与引用、文字混合
 
@@ -73,7 +73,7 @@ MP3 和带文件头的 WAV 可以交给该解码流程；nanobot 无需先转换
 ## 对本次设计的约束
 
 - TTS API 适配只负责把文本变成已明确格式的音频；NapCat 渠道负责把音频作为 `record` 发出。生成成功与发送成功是两个状态。
-- 模型选择语音应落到现有 GAF 动作工具流程，返回 NapCat 的实际消息 ID，并复用动作去重、自身消息观察、动作结果记录和 `end_response` 语义。
+- 模型选择语音应落到现有 GAF 动作工具流程，返回 NapCat 的实际消息 ID，并复用动作去重、自身消息观察、动作结果记录和 `continue_response` 语义。
 - 应让模型在一次语音动作调用中表达说什么，由执行端完成合成和发送；无需让模型复制本地路径、Base64 或 OneBot 数据结构。
 - TTS 服务故障、NapCat 转码失败和发送失败都应返回可读工具错误；全部工具调用成功且至少一次请求结束时，才满足既有结束回应条件。
 - TTS 适配以用户选定的百炼 API 为准，采用其 WAV 产物进入 NapCat 转码流程；PR 中的 Groq、Edge 或 OpenAI 参数只用于理解候选实现，不作为本项目的供应商配置。

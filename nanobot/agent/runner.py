@@ -626,7 +626,7 @@ class AgentRunner:
                 length_recovery_parts.clear()
                 await hook.after_iteration(context)
                 if (
-                    any(isinstance(result, ToolResult) and result.end_response for result in results)
+                    all(isinstance(result, ToolResult) and not result.continue_response for result in results)
                     and all(event.get("status") == "ok" for event in new_events)
                 ):
                     stop_reason = "tool_response_ended"

@@ -25,14 +25,14 @@ Telegram 已通过自己的渠道适配器区分 `send_voice` 和 `send_audio`�
 建议新增以下群动作，名称与现有 `send_message` 保持一致：
 
 ```text
-send_voice(text: string, instruction?: string, end_response: boolean = false)
+send_voice(text: string, instruction?: string, continue_response: boolean = false)
 ```
 
 | 参数 | 含义 |
 | --- | --- |
 | `text` | 本次要说的话，必填；作为百炼 `input.text`。 |
 | `instruction` | 可选的发声指令，例如轻快、低声或放慢语速；直接对应百炼的 `input.instruction`，省略时不添加发声指令。 |
-| `end_response` | 与其他 QQ 动作相同：这些工具调用已完成计划中的回应时设为 `true`，需要工具结果继续工作时设为 `false`。执行端决定是否满足结束条件。 |
+| `continue_response` | 默认 `false`，本组动作成功后结束回应；需要根据工具结果继续工作时显式设为 `true`，整组执行完后再调用模型。查询、失败和未知结果继续交回模型处理。 |
 
 工具描述说明“使用配置的音色合成给定文本，并向当前群发送一条原生语音”，音色 ID、供应商、输出格式与目标群从当前配置和群运行状态取得。模型可以调用现有文字工具，也可以调用 `send_voice`，还可以在确有两项内容时分别调用两者；一次语音调用只发送一条语音。
 
@@ -42,7 +42,7 @@ send_voice(text: string, instruction?: string, end_response: boolean = false)
 {
   "text": "嘿嘿，派蒙一直都在呀！",
   "instruction": "用轻快自然的语气说话",
-  "end_response": true
+  "continue_response": false
 }
 ```
 
@@ -64,7 +64,7 @@ flowchart TD
     A --> G[现有 GAF 动作结果与结束回应判定]
 ```
 
-`send_voice` 内部会发生合成请求、音频下载与 NapCat RPC，这些是执行端操作。模型只需要调用一次工具；工具调用全部成功并满足 `end_response` 条件时，运行时直接结束，省去“读取生成路径后再决定发送”的中间模型请求。
+`send_voice` 内部会发生合成请求、音频下载与 NapCat RPC，这些是执行端操作。模型只需要调用一次工具；本组动作全部成功且均未请求续调时，运行时直接结束，省去“读取生成路径后再决定发送”的中间模型请求。
 
 合成和下载使用异步 HTTP，放在工具执行路径中；NapCat WebSocket 接收循环继续处理事件与 RPC 回执。语音合成过程中到达的新群消息沿用现有攒批和 steer 生命周期。
 
@@ -147,7 +147,7 @@ flowchart TD
 
 成功结果保持简短，例如 `{"status":"succeeded","message_id":"123456"}`。TTS 合成成功和已入队都不等于 QQ 发送成功。
 
-结束判定继续由现有 Runner 执行：同一次模型回复中的全部工具调用都成功，并且至少一个结果带有 `end_response=true` 时，跳过下一次模型请求；任一调用失败或结果未知，就把全部结果交回模型。模型填写 `end_response` 表达计划是否完成，不负责预判工具是否成功。
+结束判定由 Runner 执行：同一次模型回复中的全部动作都成功，并且均未请求续调时，结束当前回应；任一动作显式传入 `continue_response=true`，或包含查询和通用工具时，执行完整组后再调用模型。任一调用失败或结果未知，也把全部结果交回模型。模型通过 `continue_response` 表达是否需要根据结果继续工作，执行端判断工具是否成功。
 
 执行端不自动重试语音发送或替换为文字。失败时额外发送文字属于新的可见动作，继续由模型选择现有工具决定。生成后的文件地址、Base64 和供应商错误原始响应不作为新的群消息发送。
 
